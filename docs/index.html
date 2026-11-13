@@ -10,9 +10,8 @@
 <meta name="theme-color" content="#ffcf4d">
 <title>早饭</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="__ICON_URL__">
-<link rel="icon" href="__ICON_URL__">
-<script>(function(){var b=location.pathname.replace(/\/+$/,"");document.querySelectorAll("link[rel=manifest]").forEach(function(l){l.href=b+"/"+l.getAttribute("href");});})();</script>
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
 <style>
 /* 老人优先：浅底、深字、超大字、超大按钮、一屏只放一件事 */
 :root{--bg:#fff8e7;--paper:#fff;--fg:#1f1b17;--muted:#6f655a;--line:#eadcb8;--accent:#ffcf4d;--accent-deep:#f0b000;--pick:#ff8c00;--pick-soft:#fff0d2;--good:#1b7a2a;--bad:#c62828;--bad-soft:#ffe3e3;--soft:#ffe9a8}
@@ -134,10 +133,11 @@ body.mom .menu-list .mname,body.mom .card .name{font-size:30px}
 <p class="foot"><span id="roleLine"></span> <button type="button" id="btnSwitchRole">换个人</button></p>
 </div>
 
+<script src="config.js"></script>
 <script>
 (function(){
 'use strict';
-var BASE = location.pathname.replace(/\/+$/, '');
+var BASE = String(window.BREAKFAST_API || '').replace(/\/+$/, '');
 var FALLBACK_NAME = '鸡蛋三明治', FALLBACK_EMOJI = '🥪';
 var EMOJI_RULES = [['三明治','🥪'],['汉堡','🍔'],['吐司','🍞'],['面包','🍞'],['馒头','🍞'],['花卷','🍞'],['馄饨','🥟'],['云吞','🥟'],['饺','🥟'],['包子','🥟'],['小笼','🥟'],['烧卖','🥟'],['炒饭','🍚'],['米饭','🍚'],['饭团','🍙'],['粥','🥣'],['麦片','🥣'],['燕麦','🥣'],['意面','🍝'],['荞麦','🍝'],['面','🍜'],['粉','🍜'],['蛋','🥚'],['煎饼','🥞'],['饼','🥞'],['华夫','🧇'],['牛奶','🥛'],['豆浆','🥛'],['酸奶','🥛'],['油条','🥖'],['香蕉','🍌'],['苹果','🍎'],['水果','🍎'],['汤','🍲'],['火腿','🥓'],['培根','🥓'],['香肠','🌭'],['红薯','🍠'],['玉米','🌽']];
 function emojiFor(name){ for (var i=0;i<EMOJI_RULES.length;i++){ if (name.indexOf(EMOJI_RULES[i][0])>=0) return EMOJI_RULES[i][1]; } return '🍽️'; }
@@ -172,6 +172,7 @@ function api(path, opts){
   var o = { method: opts.method||'GET', headers: {} };
   if (opts.json){ o.headers['Content-Type']='application/json'; o.body=JSON.stringify(opts.json); }
   if (opts.blob){ o.headers['Content-Type']=opts.blob.type||'image/jpeg'; o.body=opts.blob; }
+  if(!BASE){ return Promise.reject(new Error('还没配置接口地址（docs/config.js）')); }
   return fetch(BASE+path, o).then(function(r){
     return r.json().catch(function(){ return {}; }).then(function(j){ if(!r.ok) throw new Error(j.error||('出错了 '+r.status)); return j; });
   });

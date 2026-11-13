@@ -16,33 +16,37 @@ A tiny shared "what's for breakfast" app for a parent and a child. Chinese UI, b
 ## 结构
 
 ```
-web/index.html                         前端（纯 HTML/CSS/JS，没有框架）
-web/icon.png                           主屏幕图标
-supabase/functions/breakfast/index.ts  后端：Supabase Edge Function，同时托管网页和接口
-supabase/functions/breakfast/page.ts   由 scripts/build.js 生成：把网页打进函数
+docs/index.html                        前端（纯 HTML/CSS/JS，没有框架），由 GitHub Pages 托管
+docs/config.js                         只有一行：接口地址，换成你自己的
+docs/icon.png, docs/manifest.webmanifest  主屏幕图标与安装信息
+supabase/functions/breakfast/index.ts  后端：Supabase Edge Function，只提供接口
 supabase/migrations/...sql             一张表（一行 JSON）+ 一个公开图片桶
-scripts/build.js                       改完 web/ 后运行：node scripts/build.js
 ```
+
+为什么前后端分开：Supabase 自带的 `*.supabase.co` 域名不允许云函数返回 HTML 页面（会被改成纯文本），所以网页放 GitHub Pages，接口放 Supabase。两边都免费。
 
 数据存在 `breakfast_state` 表的一行 JSON 里，只有云函数用 service role 读写，表本身对外没有任何策略。照片存在公开桶 `breakfast`，上传只经过云函数（限 5MB、jpg/png/webp）。
 
-## 部署（Supabase 免费版够用）
+## 部署（两边免费版都够用）
+
+**后端（Supabase）**
 
 1. 在 [Supabase](https://supabase.com) 新建一个项目。
-2. 运行迁移：
+2. 运行迁移并部署函数（必须关掉 JWT 校验，否则没登录的手机调不了）：
    ```bash
    supabase link --project-ref <你的 project ref>
    supabase db push
-   ```
-3. 把 `web/icon.png` 上传到存储桶 `breakfast`，文件名 `icon.png`（控制台 Storage 里拖进去即可，这是主屏幕图标）。
-4. 部署函数（必须关掉 JWT 校验，否则没登录的手机打不开）：
-   ```bash
-   node scripts/build.js
    supabase functions deploy breakfast --no-verify-jwt
    ```
-5. 打开 `https://<你的 project ref>.supabase.co/functions/v1/breakfast/`，把这个链接发给家人。
+3. 接口地址就是 `https://<你的 project ref>.supabase.co/functions/v1/breakfast`。
 
-可选：函数的环境变量 `BREAKFAST_TZ`（默认 `Asia/Shanghai`）只在手机没传日期时兜底用，正常情况下日期按手机本地时间算。
+**前端（GitHub Pages）**
+
+1. Fork 或复制这个仓库，把 `docs/config.js` 里的地址换成上面的接口地址。
+2. 仓库 Settings → Pages → Source 选 `main` 分支的 `/docs` 目录。
+3. 一分钟后打开 `https://<你的用户名>.github.io/<仓库名>/`，把这个链接发给家人。
+
+可选：函数环境变量 `ALLOWED_ORIGIN` 设成你的 Pages 地址（如 `https://xxx.github.io`）可以限制只有这个网页能调接口；`BREAKFAST_TZ`（默认 `Asia/Shanghai`）只在手机没传日期时兜底用。
 
 ## 给老人手机装上
 
@@ -55,7 +59,8 @@ scripts/build.js                       改完 web/ 后运行：node scripts/buil
 ```bash
 supabase start
 supabase functions serve breakfast --no-verify-jwt
-# 打开 http://localhost:54321/functions/v1/breakfast/
+# 把 docs/config.js 临时指向 http://localhost:54321/functions/v1/breakfast
+# 然后用任意静态服务器打开 docs/，比如 npx serve docs
 ```
 
 MIT License.

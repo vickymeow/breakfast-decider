@@ -1,15 +1,13 @@
-// 早饭决定器后端 + 网页托管：Supabase Edge Function（Deno）
-// 同一个地址既返回网页，也提供接口；数据在 breakfast_state 表的一行 JSON 里，照片在 breakfast 存储桶。
-//   GET  <base>/                      -> 网页
-//   GET  <base>/manifest.webmanifest  -> 添加到主屏幕用
-//   GET  <base>/api/state             -> { dishes, pick, pickDate }
+// 早饭决定器后端：Supabase Edge Function（Deno），只提供接口。
+// 网页在 docs/ 里，由 GitHub Pages 托管（Supabase 的 *.supabase.co 域名不允许云函数返回 HTML 页面）。
+// 数据在 breakfast_state 表的一行 JSON 里，照片在 breakfast 存储桶。
+//   GET  <base>/api/state             -> { dishes, pick, pickDate, targetDate }
 //   POST <base>/api/pick   {type, date}     type: 菜名 | "random" | "skip"
 //   POST <base>/api/dishes {name}
 //   DELETE <base>/api/dishes/:id
 //   POST <base>/api/dishes/:id/move  {direction: "up" | "down"}
 //   POST <base>/api/dishes/:id/photo （请求体就是图片）
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
-import { HTML } from "./page.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const supabase = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -20,6 +18,8 @@ const BUCKET = "breakfast";
 const ROW_ID = 1;
 const FUNCTION_NAME = "breakfast";
 const TZ = Deno.env.get("BREAKFAST_TZ") || "Asia/Shanghai";
+// 允许哪个网页来调接口：默认任何来源；想收紧就设置环境变量 ALLOWED_ORIGIN，比如 https://xxx.github.io
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*";
 
 type Dish = { id: number; name: string; emoji?: string; image?: string };
 type Pick = { type: "dish" | "random" | "skip"; dish: number | null; resolvedName: string | null };
@@ -66,21 +66,24 @@ function targetDate(): string {
   return d.toISOString().slice(0, 10);
 }
 
-// 统一用 Headers 对象 + 字节流返回：运行时对普通对象形式的响应头有时不生效，页面会被当成纯文本
-const encoder = new TextEncoder();
-function respond(body: string, contentType: string, cacheControl: string, status = 200): Response {
-  const headers = new Headers();
-  headers.set("content-type", contentType);
-  headers.set("cache-control", cacheControl);
-  headers.set("x-content-type-options", "nosniff");
-  return new Response(encoder.encode(body), { status, headers });
+// ---- 响应 ----
+function corsHeaders(): Headers {
+  const h = new Headers();
+  h.set("access-control-allow-origin", ALLOWED_ORIGIN);
+  h.set("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
+  h.set("access-control-allow-headers", "content-type");
+  h.set("access-control-max-age", "86400");
+  h.set("vary", "origin");
+  return h;
 }
-const json = (body: unknown, status = 200) => respond(JSON.stringify(body), "application/json; charset=utf-8", "no-store", status);
+const encoder = new TextEncoder();
+const json = (body: unknown, status = 200) => {
+  const headers = corsHeaders();
+  headers.set("content-type", "application/json; charset=utf-8");
+  headers.set("cache-control", "no-store");
+  return new Response(encoder.encode(JSON.stringify(body)), { status, headers });
+};
 const bad = (msg: string, status = 400) => json({ error: msg }, status);
-
-// 主屏幕图标放在公开桶里（部署时上传 web/icon.png 为 breakfast/icon.png）
-const ICON_URL = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/icon.png`;
-const PAGE = HTML.split("__ICON_URL__").join(ICON_URL);
 
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
@@ -90,21 +93,13 @@ Deno.serve(async (req: Request) => {
   path = path.replace(/\/+$/, "") || "/";
   const m = req.method;
 
+  if (m === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders() });
+
   try {
-    // ---- 静态 ----
     if (m === "GET" && path === "/") {
-      return respond(PAGE, "text/html; charset=utf-8", "no-cache");
-    }
-    if (m === "GET" && path === "/manifest.webmanifest") {
-      const manifest = {
-        name: "早饭", short_name: "早饭", lang: "zh-CN", start_url: "./", scope: "./", display: "standalone",
-        background_color: "#fff8e7", theme_color: "#ffcf4d",
-        icons: [{ src: ICON_URL, sizes: "192x192", type: "image/png", purpose: "any" }],
-      };
-      return respond(JSON.stringify(manifest), "application/manifest+json; charset=utf-8", "public, max-age=3600");
+      return json({ ok: true, hint: "这是早饭决定器的接口；网页请打开 GitHub Pages 的地址。" });
     }
 
-    // ---- 接口 ----
     if (m === "GET" && path === "/api/state") {
       const db = await loadDb();
       return json({ dishes: db.dishes, pick: db.pick, pickDate: db.pickDate, targetDate: targetDate() });
