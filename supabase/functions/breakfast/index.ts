@@ -98,7 +98,7 @@ Deno.serve(async (req: Request) => {
       const manifest = {
         name: "早饭", short_name: "早饭", lang: "zh-CN", start_url: "./", scope: "./", display: "standalone",
         background_color: "#fff8e7", theme_color: "#ffcf4d",
-        icons: [{ src: "./icon.png", sizes: "512x512", type: "image/png", purpose: "any" }],
+        icons: [{ src: "./icon.png", sizes: "192x192", type: "image/png", purpose: "any" }],
       };
       return new Response(JSON.stringify(manifest), { headers: { "Content-Type": "application/manifest+json; charset=utf-8", "Cache-Control": "public, max-age=3600" } });
     }
