@@ -66,8 +66,16 @@ function targetDate(): string {
   return d.toISOString().slice(0, 10);
 }
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
+// 统一用 Headers 对象 + 字节流返回：运行时对普通对象形式的响应头有时不生效，页面会被当成纯文本
+const encoder = new TextEncoder();
+function respond(body: string, contentType: string, cacheControl: string, status = 200): Response {
+  const headers = new Headers();
+  headers.set("content-type", contentType);
+  headers.set("cache-control", cacheControl);
+  headers.set("x-content-type-options", "nosniff");
+  return new Response(encoder.encode(body), { status, headers });
+}
+const json = (body: unknown, status = 200) => respond(JSON.stringify(body), "application/json; charset=utf-8", "no-store", status);
 const bad = (msg: string, status = 400) => json({ error: msg }, status);
 
 // 主屏幕图标放在公开桶里（部署时上传 web/icon.png 为 breakfast/icon.png）
@@ -85,7 +93,7 @@ Deno.serve(async (req: Request) => {
   try {
     // ---- 静态 ----
     if (m === "GET" && path === "/") {
-      return new Response(PAGE, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" } });
+      return respond(PAGE, "text/html; charset=utf-8", "no-cache");
     }
     if (m === "GET" && path === "/manifest.webmanifest") {
       const manifest = {
@@ -93,7 +101,7 @@ Deno.serve(async (req: Request) => {
         background_color: "#fff8e7", theme_color: "#ffcf4d",
         icons: [{ src: ICON_URL, sizes: "192x192", type: "image/png", purpose: "any" }],
       };
-      return new Response(JSON.stringify(manifest), { headers: { "Content-Type": "application/manifest+json; charset=utf-8", "Cache-Control": "public, max-age=3600" } });
+      return respond(JSON.stringify(manifest), "application/manifest+json; charset=utf-8", "public, max-age=3600");
     }
 
     // ---- 接口 ----
