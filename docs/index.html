@@ -109,7 +109,7 @@ body.mom .menu-list .mname,body.mom .card .name{font-size:30px}
 </nav>
 
 <section id="view-pick" class="view">
-  <p class="hint">点图片就选好啦，可以选几样，再点一下取消</p>
+  <p class="hint">点图片就选好啦，可以选几样，再点一下取消。早上 6 点还没选就自动随机一样</p>
   <div id="pickGrid" class="grid"></div>
   <div class="special">
     <button type="button" id="btnRandom" class="big-btn">随便</button>
@@ -186,7 +186,8 @@ function api(path, opts){
   });
 }
 function loadState(){
-  return api('/api/state').then(function(s){ state=s; loaded=true; lastOk=Date.now(); $('syncNote').textContent=''; render(); })
+  var now=new Date();
+  return api('/api/state?date='+localDate(now)+'&hour='+now.getHours()).then(function(s){ state=s; loaded=true; lastOk=Date.now(); $('syncNote').textContent=''; render(); })
     .catch(function(){ if(!loaded) $('syncNote').textContent='连不上网，正在重试…'; else if(Date.now()-lastOk>60000) $('syncNote').textContent='网络不太好，显示的可能不是最新的'; render(); });
 }
 function act(p){ return p.then(loadState).catch(function(e){ toast(e.message||'没成功，请再试一次'); }); }
@@ -205,7 +206,8 @@ function render(){
     if(k>=0) ids.splice(k,1); else ids.push(id);
     act(api('/api/pick',{method:'POST',json:{type:'dishes',ids:ids,date:td}}).then(function(r){ toast(r.pick ? '选好了：'+r.pick.resolvedName : '取消了，还没选'); }));
   }; });
-  $('pickStatus').textContent = cur ? (cur.type==='skip'?'已选好：今天不吃':'已选好：'+cur.resolvedName+(cur.type==='random'?'（随便选的）':'')) : (loaded?'还没选，不选就是'+FALLBACK_NAME:'');
+  var autoH=state.autoPickHour||6;
+  $('pickStatus').textContent = cur ? (cur.type==='skip'?'已选好：今天不吃':'已选好：'+cur.resolvedName+(cur.auto?'（早上 '+autoH+' 点没人选，自动随机的）':cur.type==='random'?'（随便选的）':'')) : (loaded?'还没选。早上 '+autoH+' 点还没选的话，自动随机一样':'');
   $('btnRandom').disabled=!list.length;
 
   var mc=$('morningCard'), name, sub, body;
@@ -214,7 +216,7 @@ function render(){
   else if(cur){
     var ds=pickedIds(cur).map(dishById).filter(Boolean);
     name=cur.resolvedName||ds.map(function(d){ return d.name; }).join('＋');
-    sub=cur.type==='random'?'随便选的，就它了':(ds.length>1?'女儿选的，这几样一起':'女儿选的');
+    sub=cur.auto?'没人选，早上 '+(state.autoPickHour||6)+' 点自动随机的':cur.type==='random'?'随便选的，就它了':(ds.length>1?'女儿选的，这几样一起':'女儿选的');
     body='<div class="pics'+(ds.length>1?' multi':'')+'">'+(ds.length?ds.map(function(d){ return picHtml(d, ds.length>1); }).join(''):'<div class="pic"><span class="emoji">'+emojiFor(name)+'</span></div>')+'</div>';
     var ns=ds.length?ds.map(function(d){ return d.name; }):[name];
     speakText='今天早饭是'+(ns.length>1?ns.slice(0,-1).join('、')+'和'+ns[ns.length-1]:ns[0]);

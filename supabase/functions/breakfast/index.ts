@@ -1,7 +1,8 @@
 // 早饭决定器后端：Supabase Edge Function（Deno），只提供接口。
 // 网页在 docs/ 里，由 GitHub Pages 托管（Supabase 的 *.supabase.co 域名不允许云函数返回 HTML 页面）。
 // 数据在 breakfast_state 表的一行 JSON 里，照片在 breakfast 存储桶。
-//   GET  <base>/api/state             -> { dishes, pick, pickDate, targetDate }
+//   GET  <base>/api/state?date=YYYY-MM-DD&hour=H -> { dishes, pick, pickDate, targetDate, voice }
+//        date/hour 是手机的本地日期和钟点：当天早上 6 点后还没人选，就自动随机定一样（AUTO_PICK_HOUR 可改）
 //   POST <base>/api/pick   {type, date}     type: "dishes"（配 ids 数组，可多选）| 菜名 | "random" | "skip"
 //   POST <base>/api/transcribe （请求体是录音，需配置 OPENAI_API_KEY 才开）
 //   POST <base>/api/dishes {name}
@@ -21,13 +22,15 @@ const FUNCTION_NAME = "breakfast";
 const TZ = Deno.env.get("BREAKFAST_TZ") || "Asia/Shanghai";
 // 允许哪个网页来调接口：默认任何来源；想收紧就设置环境变量 ALLOWED_ORIGIN，比如 https://xxx.github.io
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*";
+// 当天到了这个钟点还没人选，就自动随机定一样；只在下午 3 点前生效（3 点后页面已经在选明天）
+const AUTO_PICK_HOUR = Number(Deno.env.get("AUTO_PICK_HOUR") || "6");
 // 录音转文字（给微信等没有浏览器语音识别的环境用）：在 Supabase 后台 Edge Functions → Secrets 里配置 OPENAI_API_KEY 即开启
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
 const TRANSCRIBE_MODEL = Deno.env.get("OPENAI_TRANSCRIBE_MODEL") || "gpt-4o-mini-transcribe";
 
 type Dish = { id: number; name: string; emoji?: string; image?: string };
 // dishes：选中的菜（可多选）；dish 保留第一道，兼容旧数据
-type Pick = { type: "dish" | "random" | "skip"; dish: number | null; dishes?: number[]; resolvedName: string | null };
+type Pick = { type: "dish" | "random" | "skip"; dish: number | null; dishes?: number[]; resolvedName: string | null; auto?: boolean };
 type Db = { dishes: Dish[]; pick: Pick | null; pickDate: string | null };
 
 const SEED: Db = {
@@ -71,6 +74,17 @@ function targetDate(): string {
   return d.toISOString().slice(0, 10);
 }
 
+// 当天 6 点后还没选：随机定一样。返回是否改了
+function autoPickIfDue(db: Db, date: string, hour: number): boolean {
+  if (!(hour >= AUTO_PICK_HOUR && hour < 15)) return false;
+  if (db.pick && db.pickDate === date) return false;
+  if (!db.dishes.length) return false;
+  const dish = db.dishes[Math.floor(Math.random() * db.dishes.length)];
+  db.pick = { type: "random", dish: dish.id, dishes: [dish.id], resolvedName: dish.name, auto: true };
+  db.pickDate = date;
+  return true;
+}
+
 // ---- 响应 ----
 function corsHeaders(): Headers {
   const h = new Headers();
@@ -107,7 +121,12 @@ Deno.serve(async (req: Request) => {
 
     if (m === "GET" && path === "/api/state") {
       const db = await loadDb();
-      return json({ dishes: db.dishes, pick: db.pick, pickDate: db.pickDate, targetDate: targetDate(), voice: !!OPENAI_API_KEY });
+      const qDate = url.searchParams.get("date") || "";
+      const qHour = Number(url.searchParams.get("hour"));
+      if (/^\d{4}-\d{2}-\d{2}$/.test(qDate) && Number.isInteger(qHour) && qHour >= 0 && qHour <= 23) {
+        if (autoPickIfDue(db, qDate, qHour)) await saveDb(db);
+      }
+      return json({ dishes: db.dishes, pick: db.pick, pickDate: db.pickDate, targetDate: targetDate(), voice: !!OPENAI_API_KEY, autoPickHour: AUTO_PICK_HOUR });
     }
 
     if (m === "POST" && path === "/api/pick") {
