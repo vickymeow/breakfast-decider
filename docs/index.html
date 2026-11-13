@@ -121,7 +121,7 @@ body.mom .menu-list .mname,body.mom .card .name{font-size:30px}
 <section id="view-menu" class="view">
   <p class="hint">加新菜、拍张照片、删除、上下移动</p>
   <form class="add-row" id="addForm">
-    <input id="newDishName" placeholder="输入菜名，比如：三文鱼吐司" autocomplete="off">
+    <input id="newDishName" placeholder="输入菜名，或按键盘 🎤 说话" autocomplete="off">
     <button type="submit" id="btnAdd" class="big-btn" style="flex:0 0 auto">加菜</button>
   </form>
   <button type="button" id="btnVoice" class="big-btn">🎤 语音加菜</button>
@@ -254,15 +254,36 @@ $('btnSpeak').onclick=function(){ speak($('morningCard').getAttribute('data-spea
 if('speechSynthesis' in window) speechSynthesis.onvoiceschanged=function(){};
 
 // ---- 语音加菜 ----
+// 优先用浏览器自带的语音识别（Chrome / Safari）；微信内置浏览器等不支持的环境，改用手机键盘上的话筒键听写
 var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-if(!SR) $('btnVoice').hidden=true;
-else $('btnVoice').onclick=function(){
-  var vs=$('voiceStatus'), btn=$('btnVoice'), r=new SR(); r.lang='zh-CN'; r.interimResults=false; r.maxAlternatives=1;
+var inWeChat=/MicroMessenger/i.test(navigator.userAgent);
+function keyboardDictation(prefix){
+  var inp=$('newDishName'), vs=$('voiceStatus');
+  inp.value=''; inp.focus();
+  vs.textContent=(prefix||'')+'请点键盘上的 🎤 话筒键说菜名，说完点「加菜」';
+}
+$('btnVoice').onclick=function(){
+  var vs=$('voiceStatus'), btn=$('btnVoice');
+  if(!SR || inWeChat){ keyboardDictation(''); return; }
+  var r; try{ r=new SR(); }catch(e){ keyboardDictation(''); return; }
+  r.lang='zh-CN'; r.interimResults=true; r.maxAlternatives=1; r.continuous=false;
+  var heard='', failed=false;
   vs.textContent='请说菜名…'; btn.classList.add('listening');
-  r.onresult=function(e){ var name=e.results[0][0].transcript.replace(/[。，,.!！?？\s]+$/,'').trim(); vs.textContent='听到：'+name; act(api('/api/dishes',{method:'POST',json:{name:name}}).then(function(){ toast('已加上：'+name); })); };
-  r.onerror=function(e){ vs.textContent = e.error==='not-allowed' ? '没有麦克风权限，请打字加菜' : '没听清，请再说一次'; };
-  r.onend=function(){ btn.classList.remove('listening'); };
-  try{ r.start(); }catch(e){ vs.textContent='语音暂时用不了，请打字加菜'; btn.classList.remove('listening'); }
+  r.onresult=function(e){ var t=''; for(var i=0;i<e.results.length;i++){ t+=e.results[i][0].transcript; } if(t){ heard=t; vs.textContent='听到：'+t; } };
+  r.onerror=function(e){
+    failed=true; btn.classList.remove('listening');
+    if(e.error==='no-speech'){ vs.textContent='没听到声音，再点一次，离手机近一点说'; return; }
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'){ keyboardDictation('没有麦克风权限。'); return; }
+    keyboardDictation('这个浏览器不能直接听。');
+  };
+  r.onend=function(){
+    btn.classList.remove('listening');
+    if(failed) return;
+    var name=heard.replace(/[。，,.!！?？\s]+$/,'').trim();
+    if(!name){ vs.textContent='没听清，请再说一次'; return; }
+    act(api('/api/dishes',{method:'POST',json:{name:name}}).then(function(){ toast('已加上：'+name); vs.textContent='已加上：'+name; }));
+  };
+  try{ r.start(); }catch(e){ btn.classList.remove('listening'); keyboardDictation(''); }
 };
 
 // ---- 角色与页面 ----
