@@ -2,7 +2,6 @@
 // 同一个地址既返回网页，也提供接口；数据在 breakfast_state 表的一行 JSON 里，照片在 breakfast 存储桶。
 //   GET  <base>/                      -> 网页
 //   GET  <base>/manifest.webmanifest  -> 添加到主屏幕用
-//   GET  <base>/icon.png
 //   GET  <base>/api/state             -> { dishes, pick, pickDate }
 //   POST <base>/api/pick   {type, date}     type: 菜名 | "random" | "skip"
 //   POST <base>/api/dishes {name}
@@ -10,7 +9,7 @@
 //   POST <base>/api/dishes/:id/move  {direction: "up" | "down"}
 //   POST <base>/api/dishes/:id/photo （请求体就是图片）
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
-import { HTML, ICON_PNG_B64 } from "./assets.ts";
+import { HTML } from "./page.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const supabase = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -71,12 +70,9 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
 const bad = (msg: string, status = 400) => json({ error: msg }, status);
 
-function b64ToBytes(b64: string) {
-  const bin = atob(b64); const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-const ICON = b64ToBytes(ICON_PNG_B64);
+// 主屏幕图标放在公开桶里（部署时上传 web/icon.png 为 breakfast/icon.png）
+const ICON_URL = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/icon.png`;
+const PAGE = HTML.split("__ICON_URL__").join(ICON_URL);
 
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
@@ -89,16 +85,13 @@ Deno.serve(async (req: Request) => {
   try {
     // ---- 静态 ----
     if (m === "GET" && path === "/") {
-      return new Response(HTML, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" } });
-    }
-    if (m === "GET" && path === "/icon.png") {
-      return new Response(ICON, { headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=604800" } });
+      return new Response(PAGE, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" } });
     }
     if (m === "GET" && path === "/manifest.webmanifest") {
       const manifest = {
         name: "早饭", short_name: "早饭", lang: "zh-CN", start_url: "./", scope: "./", display: "standalone",
         background_color: "#fff8e7", theme_color: "#ffcf4d",
-        icons: [{ src: "./icon.png", sizes: "192x192", type: "image/png", purpose: "any" }],
+        icons: [{ src: ICON_URL, sizes: "192x192", type: "image/png", purpose: "any" }],
       };
       return new Response(JSON.stringify(manifest), { headers: { "Content-Type": "application/manifest+json; charset=utf-8", "Cache-Control": "public, max-age=3600" } });
     }

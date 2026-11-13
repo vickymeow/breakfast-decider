@@ -19,7 +19,7 @@ A tiny shared "what's for breakfast" app for a parent and a child. Chinese UI, b
 web/index.html                         前端（纯 HTML/CSS/JS，没有框架）
 web/icon.png                           主屏幕图标
 supabase/functions/breakfast/index.ts  后端：Supabase Edge Function，同时托管网页和接口
-supabase/functions/breakfast/assets.ts 由 scripts/build.js 生成：把网页和图标打进函数
+supabase/functions/breakfast/page.ts   由 scripts/build.js 生成：把网页打进函数
 supabase/migrations/...sql             一张表（一行 JSON）+ 一个公开图片桶
 scripts/build.js                       改完 web/ 后运行：node scripts/build.js
 ```
@@ -34,12 +34,13 @@ scripts/build.js                       改完 web/ 后运行：node scripts/buil
    supabase link --project-ref <你的 project ref>
    supabase db push
    ```
-3. 部署函数（必须关掉 JWT 校验，否则没登录的手机打不开）：
+3. 把 `web/icon.png` 上传到存储桶 `breakfast`，文件名 `icon.png`（控制台 Storage 里拖进去即可，这是主屏幕图标）。
+4. 部署函数（必须关掉 JWT 校验，否则没登录的手机打不开）：
    ```bash
    node scripts/build.js
    supabase functions deploy breakfast --no-verify-jwt
    ```
-4. 打开 `https://<你的 project ref>.supabase.co/functions/v1/breakfast/`，把这个链接发给家人。
+5. 打开 `https://<你的 project ref>.supabase.co/functions/v1/breakfast/`，把这个链接发给家人。
 
 可选：函数的环境变量 `BREAKFAST_TZ`（默认 `Asia/Shanghai`）只在手机没传日期时兜底用，正常情况下日期按手机本地时间算。
 
