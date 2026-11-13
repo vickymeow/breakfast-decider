@@ -6,9 +6,9 @@ A tiny shared "what's for breakfast" app for a parent and a child. Chinese UI, b
 
 ## 功能
 
-- **选早饭**（女儿）：点一张图就选好；下午 3 点后自动选的是明天。也可以点「随便」（当场定下一道具体的菜）或「今天不吃」。
+- **选早饭**（女儿）：点图片就选好，可以多选几样，再点一下取消；下午 3 点后自动选的是明天。也可以点「随便」（当场定下一道具体的菜）或「今天不吃」。
 - **今天早上**（妈妈）：只看一个大答案，大图、超大菜名、一个「读给我听」按钮（系统中文朗读）。没选就是鸡蛋三明治。
-- **菜单**：打字或语音加新菜（Chrome / Safari 用浏览器语音识别；微信等不支持的浏览器自动改用键盘话筒听写）、给每道菜拍一张真照片、删除（点两下确认）、上下排序。
+- **菜单**：打字或语音加新菜、给每道菜拍一张真照片、删除（点两下确认）、上下排序。语音有三级方案：配置了 `OPENAI_API_KEY` 时按一下录音、说完再按一下，后端识别（微信里也能用）；否则 Chrome / Safari 用浏览器自带语音识别；再不行提示用键盘话筒听写。
 - **第一次打开选「我是妈妈 / 我是女儿」**：妈妈的手机以后一打开就是今天的答案，少一个页签，字再大一号。
 - **添加到主屏幕**：带图标和名字，像一个 App 一样打开。
 - **同步**：每 10 秒拉一次，切回页面时立刻刷新。
@@ -46,7 +46,7 @@ supabase/migrations/...sql             一张表（一行 JSON）+ 一个公开�
 2. 仓库 Settings → Pages → Source 选 `main` 分支的 `/docs` 目录。
 3. 一分钟后打开 `https://<你的用户名>.github.io/<仓库名>/`，把这个链接发给家人。
 
-可选：函数环境变量 `ALLOWED_ORIGIN` 设成你的 Pages 地址（如 `https://xxx.github.io`）可以限制只有这个网页能调接口；`BREAKFAST_TZ`（默认 `Asia/Shanghai`）只在手机没传日期时兜底用。
+可选：在 Supabase 后台 Edge Functions → Secrets 添加 `OPENAI_API_KEY`，就开启后端录音识别（模型默认 `gpt-4o-mini-transcribe`，可用 `OPENAI_TRANSCRIBE_MODEL` 改），几分钱一小时，不配也能用。函数环境变量 `ALLOWED_ORIGIN` 设成你的 Pages 地址（如 `https://xxx.github.io`）可以限制只有这个网页能调接口；`BREAKFAST_TZ`（默认 `Asia/Shanghai`）只在手机没传日期时兜底用。
 
 ## 给老人手机装上
 

@@ -45,7 +45,13 @@ nav button.active{background:var(--accent)}
 #btnSkip{background:var(--bad-soft);border-color:var(--bad)}
 .status{font-size:24px;text-align:center;color:var(--good);min-height:1.4em;margin:14px 0 0;font-weight:700}
 .morning-card{background:var(--paper);border-radius:28px;overflow:hidden;text-align:center;margin-bottom:16px;border:4px solid var(--line)}
+.morning-card .pics{display:grid;grid-template-columns:1fr}
 .morning-card .pic{height:auto;aspect-ratio:4/3;max-height:46vh}
+.morning-card .pics.multi{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:4px}
+.morning-card .pics.multi .pic{height:170px;aspect-ratio:auto;max-height:none}
+.morning-card .pics.multi .pic .emoji{font-size:96px}
+.pic .cap{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);color:#fff;font-size:22px;font-weight:700;padding:4px 6px;display:none}
+.pics.multi .pic .cap{display:block}
 .morning-card .pic .emoji{font-size:150px}
 .morning-card .name{font-size:64px;font-weight:800;padding:20px 10px 6px;overflow-wrap:anywhere;line-height:1.1}
 .morning-card .sub{font-size:26px;color:var(--muted);padding:0 12px 22px}
@@ -103,7 +109,7 @@ body.mom .menu-list .mname,body.mom .card .name{font-size:30px}
 </nav>
 
 <section id="view-pick" class="view">
-  <p class="hint">点一张图片就选好啦</p>
+  <p class="hint">点图片就选好啦，可以选几样，再点一下取消</p>
   <div id="pickGrid" class="grid"></div>
   <div class="special">
     <button type="button" id="btnRandom" class="big-btn">随便</button>
@@ -160,11 +166,13 @@ function dateLabel(ds){
   if (ds===localDate(new Date())) return '今天 '+base; if (ds===localDate(t)) return '明天 '+base; return base;
 }
 function pickIsCurrent(){ return state.pick && state.pickDate===targetDate(); }
-function picHtml(d){
+function picHtml(d, cap){
   var em = '<span class="emoji" aria-hidden="true">'+esc(d.emoji||emojiFor(d.name))+'</span>';
   var img = d.image ? '<img src="'+esc(d.image)+'" alt="" loading="lazy" onload="this.className=\'ok\'" onerror="this.remove()">' : '';
-  return '<div class="pic">'+em+img+'</div>';
+  return '<div class="pic">'+em+img+(cap?'<span class="cap">'+esc(d.name)+'</span>':'')+'</div>';
 }
+function pickedIds(cur){ if(!cur||cur.type==='skip') return []; if(cur.dishes&&cur.dishes.length) return cur.dishes.slice(); return cur.dish!=null?[cur.dish]:[]; }
+function dishById(id){ var l=state.dishes||[]; for(var i=0;i<l.length;i++) if(l[i].id===id) return l[i]; return null; }
 
 // ---- 网络 ----
 function api(path, opts){
@@ -191,17 +199,29 @@ function render(){
   var grid=$('pickGrid');
   if(!loaded) grid.innerHTML='<div class="empty">正在打开菜单…</div>';
   else if(!list.length) grid.innerHTML='<div class="empty">菜单还是空的，到「菜单」页加第一道菜吧。</div>';
-  else grid.innerHTML=list.map(function(d){ var sel=cur&&cur.dish===d.id; return '<button type="button" class="card'+(sel?' selected':'')+'" data-name="'+esc(d.name)+'">'+picHtml(d)+'<div class="name">'+esc(d.name)+'</div>'+(sel?'<div class="tick">✓ 就吃这个</div>':'')+'</button>'; }).join('');
-  Array.prototype.forEach.call(grid.querySelectorAll('.card'), function(el){ el.onclick=function(){ act(api('/api/pick',{method:'POST',json:{type:el.getAttribute('data-name'),date:td}}).then(function(){ toast('选好了：'+el.getAttribute('data-name')); })); }; });
+  else { var selIds=pickedIds(cur); grid.innerHTML=list.map(function(d){ var sel=selIds.indexOf(d.id)>=0; return '<button type="button" class="card'+(sel?' selected':'')+'" data-id="'+d.id+'" aria-pressed="'+(sel?'true':'false')+'">'+picHtml(d)+'<div class="name">'+esc(d.name)+'</div>'+(sel?'<div class="tick">✓ 就吃这个</div>':'')+'</button>'; }).join(''); }
+  Array.prototype.forEach.call(grid.querySelectorAll('.card'), function(el){ el.onclick=function(){
+    var ids=pickedIds(cur), id=Number(el.getAttribute('data-id')), k=ids.indexOf(id);
+    if(k>=0) ids.splice(k,1); else ids.push(id);
+    act(api('/api/pick',{method:'POST',json:{type:'dishes',ids:ids,date:td}}).then(function(r){ toast(r.pick ? '选好了：'+r.pick.resolvedName : '取消了，还没选'); }));
+  }; });
   $('pickStatus').textContent = cur ? (cur.type==='skip'?'已选好：今天不吃':'已选好：'+cur.resolvedName+(cur.type==='random'?'（随便选的）':'')) : (loaded?'还没选，不选就是'+FALLBACK_NAME:'');
   $('btnRandom').disabled=!list.length;
 
   var mc=$('morningCard'), name, sub, body;
-  if(cur&&cur.type==='skip'){ name='今天不吃'; sub='不用做'; body='<div class="pic"><span class="emoji">😴</span></div>'; }
-  else if(cur){ var d=null; for(var i=0;i<list.length;i++) if(list[i].id===cur.dish) d=list[i]; name=cur.resolvedName; sub=cur.type==='random'?'随便选的，就它了':'女儿选的'; body=d?picHtml(d):'<div class="pic"><span class="emoji">'+emojiFor(name)+'</span></div>'; }
-  else { name=FALLBACK_NAME; sub=loaded?'没选，就做这个':'正在连接…'; body='<div class="pic"><span class="emoji">'+FALLBACK_EMOJI+'</span></div>'; }
+  var speakText;
+  if(cur&&cur.type==='skip'){ name='今天不吃'; sub='不用做'; body='<div class="pics"><div class="pic"><span class="emoji">😴</span></div></div>'; speakText='今天不吃早饭，不用做'; }
+  else if(cur){
+    var ds=pickedIds(cur).map(dishById).filter(Boolean);
+    name=cur.resolvedName||ds.map(function(d){ return d.name; }).join('＋');
+    sub=cur.type==='random'?'随便选的，就它了':(ds.length>1?'女儿选的，这几样一起':'女儿选的');
+    body='<div class="pics'+(ds.length>1?' multi':'')+'">'+(ds.length?ds.map(function(d){ return picHtml(d, ds.length>1); }).join(''):'<div class="pic"><span class="emoji">'+emojiFor(name)+'</span></div>')+'</div>';
+    var ns=ds.length?ds.map(function(d){ return d.name; }):[name];
+    speakText='今天早饭是'+(ns.length>1?ns.slice(0,-1).join('、')+'和'+ns[ns.length-1]:ns[0]);
+  }
+  else { name=FALLBACK_NAME; sub=loaded?'没选，就做这个':'正在连接…'; body='<div class="pics"><div class="pic"><span class="emoji">'+FALLBACK_EMOJI+'</span></div></div>'; speakText='今天早饭是'+FALLBACK_NAME; }
   mc.innerHTML=body+'<div class="name">'+esc(name)+'</div>'+(sub?'<div class="sub">'+esc(sub)+'</div>':'');
-  mc.setAttribute('data-speak', name==='今天不吃'?'今天不吃早饭，不用做':'今天早饭是'+name);
+  mc.setAttribute('data-speak', speakText);
 
   var ml=$('menuList');
   if(!loaded) ml.innerHTML='';
@@ -254,17 +274,49 @@ $('btnSpeak').onclick=function(){ speak($('morningCard').getAttribute('data-spea
 if('speechSynthesis' in window) speechSynthesis.onvoiceschanged=function(){};
 
 // ---- 语音加菜 ----
-// 优先用浏览器自带的语音识别（Chrome / Safari）；微信内置浏览器等不支持的环境，改用手机键盘上的话筒键听写
+// 三级方案：1) 后端录音识别（配置了 OPENAI_API_KEY 时，微信里也能用）
+//          2) 浏览器自带语音识别（Chrome / Safari）
+//          3) 手机键盘上的话筒键听写
 var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 var inWeChat=/MicroMessenger/i.test(navigator.userAgent);
+var canRecord=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);
+var recorder=null;
+function cleanName(t){ return String(t||'').replace(/[。，,.!！?？、\s]+/g,'').replace(/^(加|加上|加一个|加个|我要|来个|来一个)/,'').trim().slice(0,30); }
+function addByVoice(name, vs){
+  if(!name){ vs.textContent='没听清，请再说一次'; return; }
+  vs.textContent='听到：'+name+'，正在加…';
+  return act(api('/api/dishes',{method:'POST',json:{name:name}}).then(function(){ toast('已加上：'+name); vs.textContent='已加上：'+name; }));
+}
 function keyboardDictation(prefix){
   var inp=$('newDishName'), vs=$('voiceStatus');
   inp.value=''; inp.focus();
   vs.textContent=(prefix||'')+'请点键盘上的 🎤 话筒键说菜名，说完点「加菜」';
 }
-$('btnVoice').onclick=function(){
+function setRecUi(on){ var btn=$('btnVoice'); btn.classList.toggle('listening',on); btn.textContent=on?'⏹ 说完了，点这里':'🎤 语音加菜'; }
+function recordAndTranscribe(){
+  var vs=$('voiceStatus');
+  if(recorder){ if(recorder.state==='recording') recorder.stop(); return; }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    var types=['audio/mp4','audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/aac'];
+    var mime=null; for(var i=0;i<types.length;i++){ if(window.MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(types[i])){ mime=types[i]; break; } }
+    var rec; try{ rec=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream); }catch(e){ stream.getTracks().forEach(function(t){ t.stop(); }); keyboardDictation('这个浏览器不能录音。'); return; }
+    var chunks=[]; recorder=rec;
+    rec.ondataavailable=function(e){ if(e.data&&e.data.size) chunks.push(e.data); };
+    rec.onstop=function(){
+      stream.getTracks().forEach(function(t){ t.stop(); }); recorder=null; setRecUi(false);
+      var type=(rec.mimeType||mime||'audio/mp4').split(';')[0];
+      var blob=new Blob(chunks,{type:type});
+      if(blob.size<1000){ vs.textContent='没录到声音，再点一次，按住说话的时间长一点'; return; }
+      vs.textContent='正在识别…';
+      api('/api/transcribe',{method:'POST',blob:blob}).then(function(r){ return addByVoice(cleanName(r.text), vs); })
+        .catch(function(e){ vs.textContent=(e&&e.message)||'识别失败，请再试一次'; });
+    };
+    rec.start(); setRecUi(true); vs.textContent='正在听…请说菜名，说完点上面的按钮';
+    setTimeout(function(){ if(recorder===rec&&rec.state==='recording') rec.stop(); },10000);
+  }).catch(function(){ keyboardDictation('没有麦克风权限。'); });
+}
+function browserRecognize(){
   var vs=$('voiceStatus'), btn=$('btnVoice');
-  if(!SR || inWeChat){ keyboardDictation(''); return; }
   var r; try{ r=new SR(); }catch(e){ keyboardDictation(''); return; }
   r.lang='zh-CN'; r.interimResults=true; r.maxAlternatives=1; r.continuous=false;
   var heard='', failed=false;
@@ -276,14 +328,13 @@ $('btnVoice').onclick=function(){
     if(e.error==='not-allowed'||e.error==='service-not-allowed'){ keyboardDictation('没有麦克风权限。'); return; }
     keyboardDictation('这个浏览器不能直接听。');
   };
-  r.onend=function(){
-    btn.classList.remove('listening');
-    if(failed) return;
-    var name=heard.replace(/[。，,.!！?？\s]+$/,'').trim();
-    if(!name){ vs.textContent='没听清，请再说一次'; return; }
-    act(api('/api/dishes',{method:'POST',json:{name:name}}).then(function(){ toast('已加上：'+name); vs.textContent='已加上：'+name; }));
-  };
+  r.onend=function(){ btn.classList.remove('listening'); if(failed) return; addByVoice(cleanName(heard), vs); };
   try{ r.start(); }catch(e){ btn.classList.remove('listening'); keyboardDictation(''); }
+}
+$('btnVoice').onclick=function(){
+  if(state.voice&&canRecord){ recordAndTranscribe(); return; }
+  if(SR&&!inWeChat){ browserRecognize(); return; }
+  keyboardDictation('');
 };
 
 // ---- 角色与页面 ----

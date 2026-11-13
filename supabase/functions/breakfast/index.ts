@@ -2,7 +2,8 @@
 // 网页在 docs/ 里，由 GitHub Pages 托管（Supabase 的 *.supabase.co 域名不允许云函数返回 HTML 页面）。
 // 数据在 breakfast_state 表的一行 JSON 里，照片在 breakfast 存储桶。
 //   GET  <base>/api/state             -> { dishes, pick, pickDate, targetDate }
-//   POST <base>/api/pick   {type, date}     type: 菜名 | "random" | "skip"
+//   POST <base>/api/pick   {type, date}     type: "dishes"（配 ids 数组，可多选）| 菜名 | "random" | "skip"
+//   POST <base>/api/transcribe （请求体是录音，需配置 OPENAI_API_KEY 才开）
 //   POST <base>/api/dishes {name}
 //   DELETE <base>/api/dishes/:id
 //   POST <base>/api/dishes/:id/move  {direction: "up" | "down"}
@@ -20,9 +21,13 @@ const FUNCTION_NAME = "breakfast";
 const TZ = Deno.env.get("BREAKFAST_TZ") || "Asia/Shanghai";
 // 允许哪个网页来调接口：默认任何来源；想收紧就设置环境变量 ALLOWED_ORIGIN，比如 https://xxx.github.io
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*";
+// 录音转文字（给微信等没有浏览器语音识别的环境用）：在 Supabase 后台 Edge Functions → Secrets 里配置 OPENAI_API_KEY 即开启
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
+const TRANSCRIBE_MODEL = Deno.env.get("OPENAI_TRANSCRIBE_MODEL") || "gpt-4o-mini-transcribe";
 
 type Dish = { id: number; name: string; emoji?: string; image?: string };
-type Pick = { type: "dish" | "random" | "skip"; dish: number | null; resolvedName: string | null };
+// dishes：选中的菜（可多选）；dish 保留第一道，兼容旧数据
+type Pick = { type: "dish" | "random" | "skip"; dish: number | null; dishes?: number[]; resolvedName: string | null };
 type Db = { dishes: Dish[]; pick: Pick | null; pickDate: string | null };
 
 const SEED: Db = {
@@ -102,7 +107,7 @@ Deno.serve(async (req: Request) => {
 
     if (m === "GET" && path === "/api/state") {
       const db = await loadDb();
-      return json({ dishes: db.dishes, pick: db.pick, pickDate: db.pickDate, targetDate: targetDate() });
+      return json({ dishes: db.dishes, pick: db.pick, pickDate: db.pickDate, targetDate: targetDate(), voice: !!OPENAI_API_KEY });
     }
 
     if (m === "POST" && path === "/api/pick") {
@@ -110,15 +115,21 @@ Deno.serve(async (req: Request) => {
       const type = String(body.type || "");
       const date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date || "")) ? String(body.date) : targetDate();
       const db = await loadDb();
-      if (type === "skip") db.pick = { type: "skip", dish: null, resolvedName: null };
+      if (type === "skip") db.pick = { type: "skip", dish: null, dishes: [], resolvedName: null };
       else if (type === "random") {
         if (!db.dishes.length) return bad("菜单是空的");
         const dish = db.dishes[Math.floor(Math.random() * db.dishes.length)];
-        db.pick = { type: "random", dish: dish.id, resolvedName: dish.name };
+        db.pick = { type: "random", dish: dish.id, dishes: [dish.id], resolvedName: dish.name };
+      } else if (type === "dishes") {
+        // 多选：按点选顺序保存，去重，忽略不存在的菜；一个都没选 = 清空选择
+        const wanted: number[] = Array.isArray(body.ids) ? body.ids.map(Number) : [];
+        const picked = wanted.filter((id, k) => wanted.indexOf(id) === k).map((id) => db.dishes.find((d) => d.id === id)).filter((d): d is Dish => !!d);
+        if (!picked.length) { db.pick = null; db.pickDate = null; await saveDb(db); return json({ pick: null, pickDate: null }); }
+        db.pick = { type: "dish", dish: picked[0].id, dishes: picked.map((d) => d.id), resolvedName: picked.map((d) => d.name).join("＋") };
       } else {
         const dish = db.dishes.find((d) => d.name === type);
         if (!dish) return bad("没有这道菜");
-        db.pick = { type: "dish", dish: dish.id, resolvedName: dish.name };
+        db.pick = { type: "dish", dish: dish.id, dishes: [dish.id], resolvedName: dish.name };
       }
       db.pickDate = date;
       await saveDb(db);
@@ -138,6 +149,25 @@ Deno.serve(async (req: Request) => {
       return json(dish);
     }
 
+    if (m === "POST" && path === "/api/transcribe") {
+      if (!OPENAI_API_KEY) return bad("还没配置语音识别", 501);
+      const ct = (req.headers.get("content-type") || "").split(";")[0].trim();
+      if (!ct.startsWith("audio/") && ct !== "video/mp4") return bad("请上传录音");
+      const bytes = new Uint8Array(await req.arrayBuffer());
+      if (bytes.length < 500) return bad("没录到声音");
+      if (bytes.length > 4 * 1024 * 1024) return bad("录音太长了");
+      const ext = ct.includes("webm") ? "webm" : ct.includes("ogg") ? "ogg" : ct.includes("wav") ? "wav" : ct.includes("mpeg") ? "mp3" : "mp4";
+      const form = new FormData();
+      form.append("file", new Blob([bytes], { type: ct }), `voice.${ext}`);
+      form.append("model", TRANSCRIBE_MODEL);
+      form.append("language", "zh");
+      form.append("prompt", "早饭菜名，例如：馄饨、鸡蛋三明治、小笼包、豆浆油条");
+      const r = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { authorization: `Bearer ${OPENAI_API_KEY}` }, body: form });
+      if (!r.ok) { console.error("transcribe failed", r.status, await r.text()); return bad("语音识别服务出错了，请再试一次", 502); }
+      const out = await r.json();
+      return json({ text: String(out.text || "").trim() });
+    }
+
     const dishRoute = path.match(/^\/api\/dishes\/(\d+)(?:\/(move|photo))?$/);
     if (dishRoute) {
       const id = Number(dishRoute[1]); const sub = dishRoute[2];
@@ -147,7 +177,12 @@ Deno.serve(async (req: Request) => {
 
       if (m === "DELETE" && !sub) {
         const [gone] = db.dishes.splice(idx, 1);
-        if (db.pick && db.pick.dish === id) { db.pick = null; db.pickDate = null; }
+        // 删的是选中的菜：从选择里去掉；一个不剩就清空
+        if (db.pick && db.pick.type !== "skip") {
+          const rest = (db.pick.dishes || (db.pick.dish != null ? [db.pick.dish] : [])).filter((x) => x !== id);
+          if (!rest.length) { db.pick = null; db.pickDate = null; }
+          else db.pick = { ...db.pick, dish: rest[0], dishes: rest, resolvedName: rest.map((x) => db.dishes.find((d) => d.id === x)?.name || "").filter(Boolean).join("＋") };
+        }
         await saveDb(db);
         if (gone.image) await supabase.storage.from(BUCKET).remove([`${id}.jpg`]).catch(() => {});
         return json({ ok: true });
