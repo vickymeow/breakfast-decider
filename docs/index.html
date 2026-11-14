@@ -25,7 +25,7 @@ header{text-align:center;padding:12px 0 2px}
 header h1{font-size:38px;margin:0}
 header p{font-size:20px;color:var(--muted);margin:4px 0 0;min-height:1.3em}
 nav{display:flex;gap:10px;position:sticky;top:env(safe-area-inset-top);background:var(--bg);z-index:5;padding:10px 0}
-nav button{flex:1;min-width:0;font-size:26px;font-weight:700;padding:16px 4px;border:3px solid var(--accent-deep);border-radius:18px;background:var(--paper)}
+nav button{flex:1;min-width:0;font-size:1.3em;font-weight:700;padding:16px 4px;border:3px solid var(--accent-deep);border-radius:18px;background:var(--paper)}
 nav button.active{background:var(--accent)}
 .view{display:none;padding-top:8px}.view.active{display:block}
 .hint{font-size:22px;color:var(--muted);text-align:center;margin:6px 0 14px}
@@ -75,6 +75,36 @@ nav button.active{background:var(--accent)}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#1f1b17;color:#fff;padding:14px 22px;border-radius:16px;font-size:22px;z-index:20;max-width:90vw;text-align:center}
 .foot{text-align:center;margin-top:28px;font-size:18px;color:var(--muted)}
 .foot button{background:none;border:none;text-decoration:underline;color:var(--muted);font-size:18px;padding:8px}
+/* 晚饭 */
+.dinner-mine{background:var(--paper);border:4px solid var(--line);border-radius:24px;padding:14px;margin-bottom:14px}
+.dinner-mine h3,.dinner-board h3,.dinner-cook h3{font-size:24px;margin:0 0 10px;color:var(--muted);font-weight:700}
+.home-row{display:flex;gap:12px}
+.home-row button{flex:1;min-width:0;font-size:30px;font-weight:800;padding:22px 10px;border-radius:20px;border:4px solid var(--line);background:var(--bg)}
+.home-row button.on.yes{background:#e3f5e4;border-color:#2e7d32}
+.home-row button.on.no{background:var(--bad-soft);border-color:var(--bad)}
+.wish-row{display:flex;gap:8px;margin-top:14px}
+.wish-row input{flex:1;min-width:0;font-size:24px;padding:14px;border-radius:16px;border:3px solid var(--line);background:var(--paper)}
+.wish-row .big-btn{flex:0 0 auto;font-size:24px;padding:14px 16px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chips button{font-size:22px;padding:10px 14px;border-radius:999px;border:2px solid var(--line);background:var(--bg)}
+.chips button.on{background:var(--accent);border-color:var(--accent-deep)}
+.said{font-size:22px;color:var(--good);font-weight:700;margin:12px 0 0;min-height:1.4em}
+.dinner-board{background:var(--paper);border:4px solid var(--line);border-radius:24px;padding:14px;margin-bottom:14px}
+.dinner-board .count{font-size:40px;font-weight:800;margin:0 0 10px}
+.dinner-board .count small{display:block;font-size:20px;color:var(--muted);font-weight:400;margin-top:2px}
+.person{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:2px solid var(--line);font-size:24px;flex-wrap:wrap}
+.person .who{font-weight:800;min-width:90px}
+.person .st{padding:4px 12px;border-radius:999px;font-size:20px;font-weight:700;background:var(--bg);border:2px solid var(--line)}
+.person .st.yes{background:#e3f5e4;border-color:#2e7d32;color:#1b5e20}
+.person .st.no{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.person .st.maybe{color:var(--muted)}
+.person .wish{color:var(--muted);flex:1;min-width:120px;overflow-wrap:anywhere}
+.cook-answer{background:var(--accent-soft, #ffe9a8);border-radius:20px;padding:16px;text-align:center;margin-top:12px}
+.cook-answer .lab{font-size:20px;color:var(--muted)}
+.cook-answer .txt{font-size:44px;font-weight:800;line-height:1.15;overflow-wrap:anywhere}
+.cook-answer .txt.none{font-size:26px;color:var(--muted);font-weight:400}
+.dinner-cook{background:var(--paper);border:4px solid var(--line);border-radius:24px;padding:14px}
+body.mom .cook-answer .txt{font-size:52px}
 /* 第一次打开：选我是谁 */
 #who{text-align:center;padding:30px 0}
 #who h2{font-size:34px;margin:0 0 8px}
@@ -83,7 +113,7 @@ nav button.active{background:var(--accent)}
 #who button.mom{background:var(--accent)}
 /* 妈妈模式：字再大一号，少一个页签 */
 body.mom{font-size:22px}
-body.mom nav button{font-size:30px;padding:20px 4px}
+body.mom nav button{font-size:1.45em;padding:20px 4px}
 body.mom .morning-card .name{font-size:76px}
 body.mom .morning-card .sub{font-size:30px}
 body.mom #btnSpeak{font-size:36px;padding:28px}
@@ -99,14 +129,11 @@ body.mom .menu-list .mname,body.mom .card .name{font-size:30px}
   <p>选一次就记住了，以后不再问</p>
   <button type="button" class="mom" data-role="mom">👩 我是妈妈</button>
   <button type="button" data-role="kid">👧 我是女儿</button>
+  <button type="button" data-role="jim">👨 我是 Jim</button>
 </section>
 
 <div id="app" hidden>
-<nav>
-  <button type="button" data-view="pick">选早饭</button>
-  <button type="button" data-view="morning">今天早上</button>
-  <button type="button" data-view="menu">菜单</button>
-</nav>
+<nav id="nav" aria-label="页面"></nav>
 
 <section id="view-pick" class="view">
   <p class="hint">点图片就选好啦，可以选几样，再点一下取消。早上 6 点还没选就自动随机一样</p>
@@ -122,6 +149,13 @@ body.mom .menu-list .mname,body.mom .card .name{font-size:30px}
   <div id="morningCard" class="morning-card"></div>
   <button type="button" id="btnSpeak" class="big-btn">🔊 读给我听</button>
   <p id="speakNote" class="note"></p>
+</section>
+
+<section id="view-dinner" class="view">
+  <p class="hint" id="dinnerHint"></p>
+  <div id="dinnerMine" class="dinner-mine" hidden></div>
+  <div id="dinnerBoard" class="dinner-board"></div>
+  <div id="dinnerCook" class="dinner-cook" hidden></div>
 </section>
 
 <section id="view-menu" class="view">
@@ -148,7 +182,14 @@ var FALLBACK_NAME = '鸡蛋三明治', FALLBACK_EMOJI = '🥪';
 var EMOJI_RULES = [['三明治','🥪'],['汉堡','🍔'],['吐司','🍞'],['面包','🍞'],['馒头','🍞'],['花卷','🍞'],['馄饨','🥟'],['云吞','🥟'],['饺','🥟'],['包子','🥟'],['小笼','🥟'],['烧卖','🥟'],['炒饭','🍚'],['米饭','🍚'],['饭团','🍙'],['粥','🥣'],['麦片','🥣'],['燕麦','🥣'],['意面','🍝'],['荞麦','🍝'],['面','🍜'],['粉','🍜'],['蛋','🥚'],['煎饼','🥞'],['饼','🥞'],['华夫','🧇'],['牛奶','🥛'],['豆浆','🥛'],['酸奶','🥛'],['油条','🥖'],['香蕉','🍌'],['苹果','🍎'],['水果','🍎'],['汤','🍲'],['火腿','🥓'],['培根','🥓'],['香肠','🌭'],['红薯','🍠'],['玉米','🌽']];
 function emojiFor(name){ for (var i=0;i<EMOJI_RULES.length;i++){ if (name.indexOf(EMOJI_RULES[i][0])>=0) return EMOJI_RULES[i][1]; } return '🍽️'; }
 
-var state = { dishes: [], pick: null, pickDate: null };
+var state = { dishes: [], pick: null, pickDate: null, dinner: null };
+var PEOPLE = { mom:{name:'妈妈',emoji:'👩'}, kid:{name:'女儿',emoji:'👧'}, jim:{name:'Jim',emoji:'👨'} };
+var MEMBERS = ['kid','jim'];           // 会对晚饭表态的人
+var DINNER_DEFAULT_HOUR = 17;          // 下午 5 点还没说，算回来吃
+var DINNER_ROLL_HOUR = 20;             // 晚上 8 点后，晚饭页说的是明天
+var NAV = { mom:['morning','dinner','menu'], kid:['pick','morning','dinner','menu'], jim:['dinner','morning'] };
+var VIEW_NAMES = { pick:'选早饭', morning:'早饭', dinner:'晚饭', menu:'菜单' };
+function dinnerDate(){ var now=new Date(), d=new Date(now); if(now.getHours()>=DINNER_ROLL_HOUR) d.setDate(d.getDate()+1); return localDate(d); }
 var loaded = false, role = null, pendingDelete = null, lastOk = 0;
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
@@ -187,7 +228,7 @@ function api(path, opts){
 }
 function loadState(){
   var now=new Date();
-  return api('/api/state?date='+localDate(now)+'&hour='+now.getHours()).then(function(s){ state=s; loaded=true; lastOk=Date.now(); $('syncNote').textContent=''; render(); })
+  return api('/api/state?date='+localDate(now)+'&hour='+now.getHours()+'&ddate='+dinnerDate()).then(function(s){ state=s; loaded=true; lastOk=Date.now(); $('syncNote').textContent=''; render(); })
     .catch(function(){ if(!loaded) $('syncNote').textContent='连不上网，正在重试…'; else if(Date.now()-lastOk>60000) $('syncNote').textContent='网络不太好，显示的可能不是最新的'; render(); });
 }
 function act(p){ return p.then(loadState).catch(function(e){ toast(e.message||'没成功，请再试一次'); }); }
@@ -225,6 +266,8 @@ function render(){
   mc.innerHTML=body+'<div class="name">'+esc(name)+'</div>'+(sub?'<div class="sub">'+esc(sub)+'</div>':'');
   mc.setAttribute('data-speak', speakText);
 
+  renderDinner();
+
   var ml=$('menuList');
   if(!loaded) ml.innerHTML='';
   else if(!list.length) ml.innerHTML='<li class="empty" style="display:block">还没有菜。在上面输入菜名，点「加菜」。</li>';
@@ -238,6 +281,63 @@ function render(){
   }).join('');
   Array.prototype.forEach.call(ml.querySelectorAll('button'), function(b){ b.onclick=function(){ menuAction(b.getAttribute('data-act'), Number(b.getAttribute('data-id'))); }; });
   Array.prototype.forEach.call(ml.querySelectorAll('input[type=file]'), function(inp){ inp.onchange=function(){ if(inp.files[0]) uploadPhoto(Number(inp.getAttribute('data-id')), inp.files[0]); }; });
+}
+
+// ---- 晚饭 ----
+function dinnerStatus(who){
+  var dn=state.dinner, r=dn&&dn.replies?dn.replies[who]:null, now=new Date();
+  var isToday = dinnerDate()===localDate(now);
+  if(r&&r.home===true) return {k:'yes',t:'回来吃'};
+  if(r&&r.home===false) return {k:'no',t:'不回来'};
+  if(isToday&&now.getHours()>=DINNER_DEFAULT_HOUR) return {k:'yes',t:'没说，算回来吃'};
+  return {k:'maybe',t:'还没说'};
+}
+function renderDinner(){
+  var dn=state.dinner, dd=dinnerDate(), isToday=dd===localDate(new Date());
+  $('dinnerHint').textContent=(isToday?'今晚':'明晚')+'的晚饭 · '+dateLabel(dd).replace(/^今天 |^明天 /,'')+(role==='mom'?'':'，告诉妈妈回不回来吃、想吃什么');
+  var mine=$('dinnerMine'), board=$('dinnerBoard'), cook=$('dinnerCook');
+  var wishes=(dn&&dn.wishes)||[];
+  // 我的表态（女儿 / Jim）
+  if(MEMBERS.indexOf(role)>=0){
+    mine.hidden=false;
+    var r=dn&&dn.replies?dn.replies[role]:null, home=r?r.home:null, wish=r?r.wish:'';
+    var chips=['随便'].concat(wishes.filter(function(w){ return w!=='随便'; })).slice(0,8);
+    mine.innerHTML='<h3>'+(isToday?'今晚':'明晚')+'回来吃吗？</h3>'
+      +'<div class="home-row"><button type="button" class="yes'+(home===true?' on':'')+'" data-home="1">🏠 回来吃</button><button type="button" class="no'+(home===false?' on':'')+'" data-home="0">🚶 不回来</button></div>'
+      +'<h3 style="margin-top:16px">想吃什么？</h3>'
+      +'<form class="wish-row" id="wishForm"><input id="wishInput" placeholder="比如：红烧肉" autocomplete="off" value="'+esc(wish||'')+'"><button type="submit" class="big-btn">告诉妈</button></form>'
+      +'<div class="chips">'+chips.map(function(w){ return '<button type="button" data-wish="'+esc(w)+'"'+(w===wish?' class="on"':'')+'>'+esc(w)+'</button>'; }).join('')+'</div>'
+      +'<p class="said">'+(r?('你说的：'+(home===true?'回来吃':home===false?'不回来':'')+(wish?(home===null?'':'，')+'想吃 '+esc(wish):'')):'')+'</p>';
+    Array.prototype.forEach.call(mine.querySelectorAll('.home-row button'), function(b){ b.onclick=function(){ dinnerReply({home:b.getAttribute('data-home')==='1'}); }; });
+    Array.prototype.forEach.call(mine.querySelectorAll('.chips button'), function(b){ b.onclick=function(){ dinnerReply({wish:b.getAttribute('data-wish')}); }; });
+    mine.querySelector('#wishForm').onsubmit=function(e){ e.preventDefault(); var v=mine.querySelector('#wishInput').value.trim(); if(v) dinnerReply({wish:v}); };
+  } else mine.hidden=true;
+  // 大家的情况
+  var n=0, rows=MEMBERS.map(function(who){
+    var st=dinnerStatus(who), r=dn&&dn.replies?dn.replies[who]:null; if(st.k==='yes') n++;
+    return '<div class="person"><span class="who">'+PEOPLE[who].emoji+' '+esc(PEOPLE[who].name)+'</span><span class="st '+st.k+'">'+st.t+'</span><span class="wish">'+(r&&r.wish?'想吃 '+esc(r.wish):'')+'</span></div>';
+  }).join('');
+  var cookTxt=dn&&dn.cook?dn.cook.text:'';
+  board.innerHTML='<p class="count">'+(loaded?('回来吃的：'+n+' 人'):'…')+'<small>（不算妈妈）</small></p>'+rows
+    +'<div class="cook-answer"><div class="lab">妈妈说</div><div class="txt'+(cookTxt?'':' none')+'">'+(cookTxt?esc(cookTxt):(role==='mom'?'还没回复，下面写一句':'妈妈还没说做什么'))+'</div></div>';
+  // 妈妈的回复
+  if(role==='mom'){
+    cook.hidden=false;
+    var sug=[]; MEMBERS.forEach(function(who){ var r=dn&&dn.replies?dn.replies[who]:null; if(r&&r.wish&&r.wish!=='随便'&&sug.indexOf(r.wish)<0) sug.push(r.wish); });
+    wishes.forEach(function(w){ if(sug.indexOf(w)<0&&sug.length<8) sug.push(w); });
+    cook.innerHTML='<h3>'+(isToday?'今晚':'明晚')+'做什么？告诉大家</h3>'
+      +'<form class="wish-row" id="cookForm"><input id="cookInput" placeholder="比如：红烧肉、西红柿炒蛋" autocomplete="off" value="'+esc(cookTxt)+'"><button type="submit" class="big-btn">发布</button></form>'
+      +'<div class="chips">'+sug.map(function(w){ return '<button type="button" data-cook="'+esc(w)+'">'+esc(w)+'</button>'; }).join('')+'<button type="button" data-cook="今晚不做饭，各自解决">不做饭</button>'+(cookTxt?'<button type="button" data-cook="">清空</button>':'')+'</div>';
+    Array.prototype.forEach.call(cook.querySelectorAll('.chips button'), function(b){ b.onclick=function(){ var v=b.getAttribute('data-cook'); if(v){ var inp=cook.querySelector('#cookInput'); inp.value = inp.value && inp.value!==v && v!=='今晚不做饭，各自解决' ? inp.value+'、'+v : v; inp.focus(); } else dinnerCook(''); }; });
+    cook.querySelector('#cookForm').onsubmit=function(e){ e.preventDefault(); dinnerCook(cook.querySelector('#cookInput').value.trim()); };
+  } else cook.hidden=true;
+}
+function dinnerReply(part){
+  var body={who:role,date:dinnerDate()}; if('home' in part) body.home=part.home; if('wish' in part) body.wish=part.wish;
+  return act(api('/api/dinner/reply',{method:'POST',json:body}).then(function(){ toast('告诉妈妈了'); }));
+}
+function dinnerCook(text){
+  return act(api('/api/dinner/cook',{method:'POST',json:{text:text,date:dinnerDate()}}).then(function(){ toast(text?'发布了：'+text:'清空了'); }));
 }
 
 function menuAction(a, id){
@@ -340,24 +440,36 @@ $('btnVoice').onclick=function(){
 };
 
 // ---- 角色与页面 ----
-var VIEWS=['pick','morning','menu'];
-function showView(v){
-  if(VIEWS.indexOf(v)<0) v = role==='mom' ? 'morning' : (new Date().getHours()<15 ? 'morning' : 'pick');
-  VIEWS.forEach(function(x){ $('view-'+x).classList.toggle('active', x===v); });
-  Array.prototype.forEach.call(document.querySelectorAll('nav button'), function(b){ b.classList.toggle('active', b.getAttribute('data-view')===v); });
+var VIEWS=['pick','morning','dinner','menu'];
+function defaultView(){
+  var h=new Date().getHours();
+  if(role==='mom') return h<13 ? 'morning' : 'dinner';
+  if(role==='jim') return 'dinner';
+  return h<13 ? 'morning' : (h<15 ? 'dinner' : 'pick');
 }
-Array.prototype.forEach.call(document.querySelectorAll('nav button'), function(b){ b.onclick=function(){ showView(b.getAttribute('data-view')); }; });
+function showView(v){
+  var allowed=NAV[role]||VIEWS;
+  if(allowed.indexOf(v)<0) v=defaultView();
+  VIEWS.forEach(function(x){ $('view-'+x).classList.toggle('active', x===v); });
+  Array.prototype.forEach.call(document.querySelectorAll('#nav button'), function(b){ b.classList.toggle('active', b.getAttribute('data-view')===v); });
+}
+function buildNav(){
+  var nav=$('nav'); var views=NAV[role]||VIEWS;
+  nav.innerHTML=views.map(function(v){ return '<button type="button" data-view="'+v+'">'+VIEW_NAMES[v]+'</button>'; }).join('');
+  nav.style.fontSize = views.length>=4 ? '0.85em' : '';
+  Array.prototype.forEach.call(nav.querySelectorAll('button'), function(b){ b.onclick=function(){ showView(b.getAttribute('data-view')); }; });
+}
 function applyRole(r){
   role=r; document.body.classList.toggle('mom', r==='mom');
   $('who').hidden=true; $('app').hidden=false;
-  document.querySelector('nav button[data-view="pick"]').style.display = r==='mom' ? 'none' : '';
-  $('roleLine').textContent = r==='mom' ? '这是妈妈的手机' : '这是女儿的手机';
+  buildNav();
+  $('roleLine').textContent = '这是'+(PEOPLE[r]?PEOPLE[r].name:'')+'的手机';
   showView(null); render();
 }
 Array.prototype.forEach.call(document.querySelectorAll('#who button'), function(b){ b.onclick=function(){ var r=b.getAttribute('data-role'); store('bf_role', r); applyRole(r); }; });
 $('btnSwitchRole').onclick=function(){ store('bf_role', null); $('app').hidden=true; $('who').hidden=false; };
 var saved=load('bf_role');
-if(saved==='mom'||saved==='kid') applyRole(saved); else $('who').hidden=false;
+if(PEOPLE[saved]) applyRole(saved); else $('who').hidden=false;
 
 loadState();
 setInterval(loadState, 10000);

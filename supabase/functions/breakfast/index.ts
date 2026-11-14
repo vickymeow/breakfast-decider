@@ -5,6 +5,8 @@
 //        date/hour 是手机的本地日期和钟点：当天早上 6 点后还没人选，就自动随机定一样（AUTO_PICK_HOUR 可改）
 //   POST <base>/api/pick   {type, date}     type: "dishes"（配 ids 数组，可多选）| 菜名 | "random" | "skip"
 //   POST <base>/api/transcribe （请求体是录音，需配置 OPENAI_API_KEY 才开）
+//   POST <base>/api/dinner/reply {who, home, wish, date}   家里人表态：回不回来吃、想吃什么
+//   POST <base>/api/dinner/cook  {text, date}              妈妈回复：今晚做什么
 //   POST <base>/api/dishes {name}
 //   DELETE <base>/api/dishes/:id
 //   POST <base>/api/dishes/:id/move  {direction: "up" | "down"}
@@ -31,7 +33,11 @@ const TRANSCRIBE_MODEL = Deno.env.get("OPENAI_TRANSCRIBE_MODEL") || "gpt-4o-mini
 type Dish = { id: number; name: string; emoji?: string; image?: string };
 // dishes：选中的菜（可多选）；dish 保留第一道，兼容旧数据
 type Pick = { type: "dish" | "random" | "skip"; dish: number | null; dishes?: number[]; resolvedName: string | null; auto?: boolean };
-type Db = { dishes: Dish[]; pick: Pick | null; pickDate: string | null };
+type DinnerReply = { home: boolean | null; wish: string; at: string };
+// 晚饭：按天一份；replies 按成员 id；cook 是妈妈的回复；wishes 是最近说过的菜（给快捷按钮用）
+type Dinner = { date: string; replies: Record<string, DinnerReply>; cook: { text: string; at: string } | null; wishes: string[] };
+type Db = { dishes: Dish[]; pick: Pick | null; pickDate: string | null; dinner?: Dinner };
+const MEMBERS = ["kid", "jim"]; // 会对晚饭表态的人（妈妈是 mom，负责回复）
 
 const SEED: Db = {
   dishes: [
@@ -57,6 +63,17 @@ async function loadDb(): Promise<Db> {
   const db = data.data as Db;
   if (!Array.isArray(db.dishes)) db.dishes = [];
   return db;
+}
+// 拿到某一天的晚饭记录；换了天就开一份新的，只保留“最近说过的菜”
+function dinnerFor(db: Db, date: string): { dinner: Dinner; changed: boolean } {
+  const cur = db.dinner;
+  if (cur && cur.date === date) return { dinner: cur, changed: false };
+  db.dinner = { date, replies: {}, cook: null, wishes: Array.isArray(cur?.wishes) ? cur!.wishes : [] };
+  return { dinner: db.dinner, changed: true };
+}
+function rememberWish(dinner: Dinner, text: string) {
+  const t = text.trim(); if (!t || t === "随便") return;
+  dinner.wishes = [t, ...dinner.wishes.filter((w) => w !== t)].slice(0, 12);
 }
 async function saveDb(db: Db) {
   const { error } = await supabase.from(TABLE).upsert({ id: ROW_ID, data: db, updated_at: new Date().toISOString() });
@@ -123,10 +140,16 @@ Deno.serve(async (req: Request) => {
       const db = await loadDb();
       const qDate = url.searchParams.get("date") || "";
       const qHour = Number(url.searchParams.get("hour"));
+      let changed = false;
       if (/^\d{4}-\d{2}-\d{2}$/.test(qDate) && Number.isInteger(qHour) && qHour >= 0 && qHour <= 23) {
-        if (autoPickIfDue(db, qDate, qHour)) await saveDb(db);
+        changed = autoPickIfDue(db, qDate, qHour) || changed;
       }
-      return json({ dishes: db.dishes, pick: db.pick, pickDate: db.pickDate, targetDate: targetDate(), voice: !!OPENAI_API_KEY, autoPickHour: AUTO_PICK_HOUR });
+      const dDate = url.searchParams.get("ddate") || "";
+      let dinner: Dinner | null = null;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dDate)) { const r = dinnerFor(db, dDate); dinner = r.dinner; changed = r.changed || changed; }
+      else dinner = db.dinner || null;
+      if (changed) await saveDb(db);
+      return json({ dishes: db.dishes, pick: db.pick, pickDate: db.pickDate, targetDate: targetDate(), voice: !!OPENAI_API_KEY, autoPickHour: AUTO_PICK_HOUR, dinner });
     }
 
     if (m === "POST" && path === "/api/pick") {
@@ -153,6 +176,36 @@ Deno.serve(async (req: Request) => {
       db.pickDate = date;
       await saveDb(db);
       return json({ pick: db.pick, pickDate: db.pickDate });
+    }
+
+    if (m === "POST" && path === "/api/dinner/reply") {
+      const body = await req.json().catch(() => ({}));
+      const who = String(body.who || "");
+      if (!MEMBERS.includes(who)) return bad("不认识这个人");
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date || "")) ? String(body.date) : "";
+      if (!date) return bad("缺日期");
+      const home = body.home === true ? true : body.home === false ? false : null;
+      const wish = String(body.wish || "").trim().slice(0, 40);
+      const db = await loadDb();
+      const { dinner } = dinnerFor(db, date);
+      const prev = dinner.replies[who];
+      dinner.replies[who] = { home: home === null && prev ? prev.home : home, wish: body.wish === undefined && prev ? prev.wish : wish, at: new Date().toISOString() };
+      rememberWish(dinner, dinner.replies[who].wish);
+      await saveDb(db);
+      return json({ dinner });
+    }
+
+    if (m === "POST" && path === "/api/dinner/cook") {
+      const body = await req.json().catch(() => ({}));
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date || "")) ? String(body.date) : "";
+      if (!date) return bad("缺日期");
+      const text = String(body.text || "").trim().slice(0, 60);
+      const db = await loadDb();
+      const { dinner } = dinnerFor(db, date);
+      dinner.cook = text ? { text, at: new Date().toISOString() } : null;
+      if (text) rememberWish(dinner, text);
+      await saveDb(db);
+      return json({ dinner });
     }
 
     if (m === "POST" && path === "/api/dishes") {
