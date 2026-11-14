@@ -37,6 +37,9 @@ const IS_TOKEN_PLAN = DASHSCOPE_API_KEY.startsWith("sk-sp-");
 const DEFAULT_BASE = IS_TOKEN_PLAN ? "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1" : "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
 const DASHSCOPE_BASE_URL = (Deno.env.get("DASHSCOPE_BASE_URL") || DEFAULT_BASE).replace(/\/+$/, "");
 const QWEN_ASR_MODEL = Deno.env.get("QWEN_ASR_MODEL") || "qwen3-asr-flash";
+// 语音模型候选：Token Plan 套餐里叫 qwen-audio-3.0-asr-flash，按量付费叫 qwen3-asr-flash；哪个能用记住哪个
+const ASR_CANDIDATES = [QWEN_ASR_MODEL, "qwen-audio-3.0-asr-flash", "qwen3-asr-flash"].filter((x, i, a) => a.indexOf(x) === i);
+let workingAsrModel: string | null = null;
 const QWEN_CHAT_MODEL = Deno.env.get("QWEN_CHAT_MODEL") || "qwen-flash";
 // 对话模型候选：配置的优先，其余按便宜到贵排；套餐里没有的（404 model_not_found）自动跳过，记住能用的
 const CHAT_CANDIDATES = [QWEN_CHAT_MODEL, "qwen3.8-flash", "qwen3.6-flash", "qwen3.7-plus", "qwen3.6-plus", "qwen-flash", "qwen-turbo", "qwen-plus", "qwen3.8-max", "qwen3.7-max", "qwen3-max", "qwen-max"].filter((x, i, a) => a.indexOf(x) === i);
@@ -181,20 +184,30 @@ function toB64(bytes: Uint8Array): string {
 }
 async function qwenTranscribe(bytes: Uint8Array, contentType: string): Promise<string> {
   const fmt = contentType.includes("webm") ? "webm" : contentType.includes("ogg") ? "ogg" : contentType.includes("wav") ? "wav" : contentType.includes("mpeg") ? "mp3" : contentType.includes("aac") ? "aac" : "mp4";
-  const body = {
-    model: QWEN_ASR_MODEL, stream: false,
-    messages: [
-      { role: "system", content: [{ type: "text", text: "家里做饭的对话，内容是菜名和食材。" }] },
-      { role: "user", content: [{ type: "input_audio", input_audio: { data: `data:${contentType};base64,${toB64(bytes)}`, format: fmt } }] },
-    ],
-    asr_options: { enable_itn: false, language: "zh" },
-  };
-  const r = await fetch(`${ASR_BASE_URL}/chat/completions`, { method: "POST", headers: { authorization: `Bearer ${ASR_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify(body) });
-  const txt = await r.text();
-  if (!r.ok) { console.error("qwen asr failed", r.status, txt.slice(0, 500)); throw new Error("asr"); }
-  const out = JSON.parse(txt);
-  const c = out?.choices?.[0]?.message?.content;
-  return (Array.isArray(c) ? c.map((x: { text?: string }) => x.text || "").join("") : String(c || "")).trim();
+  const audio = `data:${contentType};base64,${toB64(bytes)}`;
+  const order = workingAsrModel ? [workingAsrModel, ...ASR_CANDIDATES.filter((m) => m !== workingAsrModel)] : ASR_CANDIDATES;
+  let lastErr = "";
+  for (const model of order) {
+    const body = {
+      model, stream: false,
+      messages: [
+        { role: "system", content: [{ type: "text", text: "家里做饭的对话，内容是菜名和食材。" }] },
+        { role: "user", content: [{ type: "input_audio", input_audio: { data: audio, format: fmt } }] },
+      ],
+      asr_options: { enable_itn: false, language: "zh" },
+    };
+    const r = await fetch(`${ASR_BASE_URL}/chat/completions`, { method: "POST", headers: { authorization: `Bearer ${ASR_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+    const txt = await r.text();
+    if (r.ok) {
+      workingAsrModel = model;
+      const c = JSON.parse(txt)?.choices?.[0]?.message?.content;
+      return (Array.isArray(c) ? c.map((x: { text?: string }) => x.text || "").join("") : String(c || "")).trim();
+    }
+    lastErr = `${model}: ${r.status} ${txt.slice(0, 300)}`;
+    console.error("qwen asr failed", lastErr);
+    if (r.status === 401 || r.status === 403) break;
+  }
+  throw new Error("asr: " + lastErr);
 }
 async function qwenChat(messages: unknown[], extra: Record<string, unknown> = {}): Promise<string> {
   const order = workingChatModel ? [workingChatModel, ...CHAT_CANDIDATES.filter((m) => m !== workingChatModel)] : CHAT_CANDIDATES;
@@ -284,7 +297,7 @@ Deno.serve(async (req: Request) => {
         const t = await r.text();
         let ids: string[] = [];
         try { const j = JSON.parse(t); ids = (j.data || []).map((x: { id: string }) => x.id); } catch { /* 原样返回 */ }
-        return json({ base: DASHSCOPE_BASE_URL, status: r.status, count: ids.length, models: ids, raw: ids.length ? undefined : t.slice(0, 500), workingChatModel, candidates: CHAT_CANDIDATES });
+        return json({ base: DASHSCOPE_BASE_URL, status: r.status, count: ids.length, models: ids, raw: ids.length ? undefined : t.slice(0, 500), workingChatModel, workingAsrModel, candidates: CHAT_CANDIDATES, asrCandidates: ASR_CANDIDATES });
       } catch (e) { return json({ error: String(e) }, 502); }
     }
 
