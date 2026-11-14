@@ -20,6 +20,7 @@
 //   妈妈定了做什么、做好了 → 给女儿、小陈的手机发通知。每条通知同时记在 inbox 里，网页上「最近的动态」能看到内容
 //   POST /api/dinner/done  {date}                     妈妈点「做好了」：这天的晚饭当场结算（菜记一次、心愿变做过了、红包进账本）
 //   POST /api/hb/paid      {who, ids:[]}              红包发了（账本 ledger 里的条目标成已发）
+//   POST /api/dinner/add   {who, date, dishId}        菜谱本里点「我想做」：把这道菜加进那天晚饭（不替换已定的菜）；女儿小陈加的同时进心愿单，告诉妈妈
 //   GET/POST /api/cron                                定时提醒（pg_cron 每 15 分钟调一次；按家里的时区，每条每天只发一次）:
 //        晚上 8 点没选明早早饭 → 提醒女儿、小陈；早上 9 点、下午 3 点没说今晚回不回来 → 提醒本人；下午 4 点妈妈还没定今晚做什么 → 提醒妈妈
 //   POST /api/profile/:who/photo （请求体是图片）     头像
@@ -87,7 +88,7 @@ type Db = { v: number; dishes: Dish[]; pick: Pick | null; pickDate: string | nul
   tz?: string; ledger?: Ledger[]; ledgerV?: number; inbox?: Inbox[]; reminded?: Record<string, string> };
 // 要告诉家里人的动态：先记下来，30 秒内没有新动作再按当时的情况合成一条发出去（点错马上取消的就不发了）
 // 女儿、小陈的动作发给妈妈；妈妈的动作（定了做什么、做好了）发给女儿、小陈
-type Ev = { k: "wish" | "hb" | "paid" | "lpaid" | "away" | "pick" | "cook" | "made"; id?: number; date?: string };
+type Ev = { k: "wish" | "hb" | "paid" | "lpaid" | "away" | "pick" | "cook" | "made" | "plan"; id?: number; date?: string };
 const MEMBERS = ["kid", "jim"];
 const PEOPLE = ["mom", "kid", "jim"];
 const NAMES: Record<string, string> = { mom: "妈妈", kid: "女儿", jim: "小陈" };
@@ -95,6 +96,7 @@ const NOTIFY_TO = "mom";
 const NOTIFY_DELAY_MS = 30000;
 const HB_UNIT = Deno.env.get("HB_UNIT") ?? "$";
 const UNSURE = "还没想好";
+const NO_COOK = "不做饭，各自解决";
 const INBOX_MAX = 40;
 // 推送服务要求带一个联系方式；用不对外的占位地址，可以用 VAPID_SUBJECT 改
 const PUSH_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:noreply@example.com";
@@ -299,6 +301,10 @@ function describe(db: Db, who: string, evs: Ev[]): string[] {
     else if (e.k === "lpaid") { const l = (db.ledger || []).find((x) => x.id === e.id); if (l && l.paidAt) lines.push(`红包发了 🧧${HB_UNIT}${l.hb}（${l.name}）`); }
     else if (e.k === "away" && e.date) { const r = db.plans[e.date]?.replies?.[who]; if (r && r.home === false) lines.push(`${weekdayOf(e.date)}晚上不回来吃`); }
     else if (e.k === "pick" && e.date) { if (db.pick && db.pickDate === e.date) lines.push(db.pick.type === "skip" ? `${weekdayOf(e.date)}早饭不吃` : `${weekdayOf(e.date)}早饭选好了：${db.pick.resolvedName}`); }
+    else if (e.k === "plan" && e.date) {
+      const p = db.plans[e.date]; const d = db.dishes.find((x) => x.id === e.id);
+      if (p?.cook && !p.done && d && p.cook.dishIds.includes(d.id)) lines.push(`把 ${d.name} 排到${weekdayOf(e.date)}晚上了`);
+    }
     // 妈妈的动作
     else if (e.k === "cook" && e.date) {
       const p = db.plans[e.date]; if (!p?.cook || p.done) continue;
@@ -869,6 +875,37 @@ Deno.serve(async (req: Request) => {
       await saveDb(db);
       scheduleNotify(t);
       return json({ plan, made: r.made.map((d) => d.name).join("＋"), hb: (db.ledger || []).filter((l) => l.date === date), home: MEMBERS.filter((w) => plan.replies[w]?.home !== false).map((w) => NAMES[w]) });
+    }
+
+    // 菜谱本里点「我想做」→ 选一天：把这道菜加进那天的晚饭，原来定的菜留着
+    if (m === "POST" && path === "/api/dinner/add") {
+      const body = await req.json().catch(() => ({}));
+      const who = String(body.who || "");
+      if (!PEOPLE.includes(who)) return bad("不认识这个人");
+      const date = DATE_RE.test(String(body.date || "")) ? String(body.date) : "";
+      if (!date) return bad("缺日期");
+      const { db } = await loadDb();
+      const today = localNow(db).date;
+      if (date < addDays(today, -2) || date > addDays(today, 14)) return bad("只能排最近两周的");
+      const dish = db.dishes.find((d) => d.id === Number(body.dishId));
+      if (!dish) return bad("找不到这道菜");
+      const plan = planFor(db, date);
+      if (plan.done) return bad("这天已经做好了，换一天吧");
+      const ids = plan.cook ? plan.cook.dishIds.slice() : [];
+      const added = !ids.includes(dish.id);
+      if (added) ids.push(dish.id);
+      // 原来写的「还没想好」「不做饭」作废；别的文字（比如妈妈说的一道菜单外的菜）留着
+      const keep = plan.cook && plan.cook.text && plan.cook.text !== UNSURE && plan.cook.text !== NO_COOK ? plan.cook.text : "";
+      plan.cook = { dishIds: ids, text: keep, at: nowIso() };
+      // 女儿小陈排的：也算点了这道菜，进心愿单（可以包红包，做好了会结算）
+      if (MEMBERS.includes(who) && !db.wishes.some((w) => w.dishId === dish.id && w.who === who && w.status !== "done")) {
+        db.wishes.push({ id: Date.now(), dishId: dish.id, who, at: nowIso(), status: "open" });
+      }
+      syncWishes(db);
+      const t = added ? queueNotify(db, who, who === "mom" ? { k: "cook", date } : { k: "plan", id: dish.id, date }) : null;
+      await saveDb(db);
+      scheduleNotify(t);
+      return json({ plan, wishes: db.wishes, added });
     }
 
     // 红包发了：账本里标成已发

@@ -175,6 +175,15 @@ button.dlink .go{font-size:.75em;color:var(--accent-deep);margin-left:2px;text-d
 .menu-list li.dragging .drag{border-color:var(--pick);color:var(--pick);cursor:grabbing}
 .menu-tip{font-size:18px;color:var(--muted);background:var(--paper);border:2px dashed var(--line);border-radius:14px;padding:10px 12px;margin:4px 0 6px;line-height:1.5}
 .menu-tip b{color:var(--fg)}
+/* 菜谱本：「我想做」→ 选哪天 */
+.menu-list .want{display:inline-block;margin-top:8px;font-size:20px;font-weight:800;padding:8px 14px;border-radius:999px;border:3px solid var(--accent-deep);background:var(--accent);color:var(--fg)}
+.menu-list .ptag{display:inline-block;margin:8px 0 0 6px;font-size:17px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--good-soft);color:#1b5e20;border:2px solid #2e7d32;vertical-align:middle}
+.daypick button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:14px 16px;margin-bottom:8px;border-radius:18px;border:3px solid var(--line);background:var(--paper);font-size:24px}
+.daypick button b{font-size:25px}
+.daypick button small{font-size:18px;color:var(--muted);font-weight:400}
+.daypick button:not(:disabled):active{border-color:var(--accent-deep);background:var(--accent)}
+.daypick button:disabled{opacity:.5}
+.sheet .bigdone{font-size:34px;font-weight:800;line-height:1.2;margin:4px 0 14px;overflow-wrap:anywhere}
 .sughead{display:flex;align-items:center;gap:8px}
 .sughead .secfold{flex:1;min-width:0;margin:6px 0}
 .detail{margin-top:12px;border-top:2px solid var(--line);padding-top:12px}
@@ -343,7 +352,7 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
   <button type="button" id="btnMenuSuggest" class="big-btn ghost" style="width:100%" hidden>✨ 推荐几道新菜</button>
   <p id="menuSuggestStatus" class="note"></p>
   <div id="menuSuggest"></div>
-  <p class="menu-tip"><b>⭐ 拿手菜</b> = 妈妈最会做的菜：点菜页排在前面，妈妈定晚饭时单独列一栏。在菜的「详情」里设置。<br><b>☰ 按住上下拖</b>，排菜的顺序；有 🧧 红包的菜自动排最前。</p>
+  <p class="menu-tip"><b>🍳 我想做</b> = 点一下、选哪天晚上，这道菜就排进那天，小饭桌上能看到。<br><b>⭐ 拿手菜</b> = 妈妈最会做的菜：点菜页排在前面，妈妈定晚饭时单独列一栏。在菜的「详情」里设置。<br><b>☰ 按住上下拖</b>，排菜的顺序；有 🧧 红包的菜自动排最前。</p>
   <button type="button" class="secfold" id="foldDinner"></button>
   <ul id="listDinner" class="menu-list"></ul>
   <button type="button" class="secfold" id="foldBreakfast"></button>
@@ -767,7 +776,7 @@ function renderChooser(){
     var msg = who.length ? '定好了！'+who.join('和')+'点的'+(days?'，等了 '+days+' 天':'')+(hb?'，还有红包 '+hbText(hb):'')+'，一定很开心 😊' : '定好了，大家都能看到';
     act(p.then(function(){ return api('/api/dinner/cook',{method:'POST',json:{date:date,dishIds:sel,text:''}}); }), null).then(function(r){ if(r) toast(msg, who.length?5000:2600); });
   };
-  $('chooserNo').onclick=function(){ chooser=null; act(api('/api/dinner/cook',{method:'POST',json:{date:date,dishIds:[],text:'不做饭，各自解决'}}),'好，'+label+'不做饭'); };
+  $('chooserNo').onclick=function(){ chooser=null; act(api('/api/dinner/cook',{method:'POST',json:{date:date,dishIds:[],text:NO_COOK}}),'好，'+label+'不做饭'); };
   $('chooserUndo').onclick=function(){ chooser=null; act(api('/api/dinner/cook',{method:'POST',json:{date:date,dishIds:[],text:UNSURE}}),label+'先不定，大家会看到你还没想好'); };
   $('chooserCancel').onclick=function(){ chooser=null; renderChooser(); };
 }
@@ -1045,7 +1054,8 @@ function dishRow(d, i, n){
   var hb=hbTotal(d.id);
   var meta=(d.ingredients&&d.ingredients.length?'食材 '+d.ingredients.length+' 样':'还没填食材')+(d.cat==='dinner'?(d.lastMade?' · 上次 '+d.lastMade.slice(5).replace('-','/'):' · 没做过')+(d.times?' · 做过 '+d.times+' 次':''):'');
   var html='<li data-id="'+d.id+'"><div class="top"><span class="drag" data-drag="1" role="button" aria-label="按住上下拖，排顺序">☰</span><div class="thumb">'+esc(d.emoji||'🍽️')+(d.image?'<img src="'+esc(d.image)+'" alt="" onload="this.className=\'ok\'" onerror="this.remove()">':'')+'</div>'
-    +'<span class="mname">'+(d.mom&&d.cat==='dinner'?'⭐ ':'')+esc(d.name)+(hb?' '+hbHtml(hb,hbMsgOf(d.id)):'')+'<small>'+esc(meta)+'</small></span>'
+    +'<span class="mname">'+(d.mom&&d.cat==='dinner'?'⭐ ':'')+esc(d.name)+(hb?' '+hbHtml(hb,hbMsgOf(d.id)):'')+'<small>'+esc(meta)+'</small>'
+    +(d.cat==='dinner'?'<button type="button" class="want" data-act="want">🍳 我想做</button>'+plannedTags(d.id):'')+'</span>'
     +'<button type="button" class="open" data-act="toggle">'+(open?'收起':'详情')+'</button></div>';
   if(open){
     var ing=(d.ingredients||[]);
@@ -1124,8 +1134,45 @@ function endDrag(e){
 }
 ['dinner','breakfast'].forEach(function(k){ $(k==='dinner'?'foldDinner':'foldBreakfast').onclick=function(){ menuFold[k]=!menuFold[k]; store('bf_fold_'+k, menuFold[k]?'1':null); renderRecipes(); }; });
 function saveIngredients(d, items){ return act(api('/api/dishes/'+d.id+'/update',{method:'POST',json:{ingredients:items}}),'食材记住了'); }
+// 这道菜已经排在哪几天（没做的）
+function plannedTags(id){ return planDays().filter(function(p){ return !p.done&&p.cook&&(p.cook.dishIds||[]).indexOf(id)>=0; }).map(function(p){ return '<span class="ptag">📅 '+esc(nightLabel(p.date))+'</span>'; }).join(''); }
+// 「我想做」：弹出最近一周，点一天就把这道菜加进那天的晚饭（原来定的菜留着）
+function dayNote(p, id){
+  if(p.done) return '已经做好了';
+  if(p.cook&&(p.cook.dishIds||[]).indexOf(id)>=0) return '已经排在这天了';
+  var c=cookNames(p);
+  if(c&&c!==NO_COOK) return '已定：'+c+'，再加这道';
+  if(c===NO_COOK) return '原来说不做饭，改成做这道';
+  return isUnsure(p)?'妈妈还没想好':'还没定';
+}
+var NO_COOK='不做饭，各自解决';
+function openWant(d){
+  var days=planDays();
+  openSheet('<h3>🍳 哪天晚上做「'+esc(d.name)+'」？</h3><p class="hint" style="text-align:left;margin:0 0 10px">'+(role==='mom'?'点一天就排上，原来定的菜还在，小饭桌上能看到':'点一天就排上，妈妈会收到通知，她也可以再改')+'</p>'
+    +'<div class="daypick">'+days.map(function(p,i){ var dis=p.done||(p.cook&&(p.cook.dishIds||[]).indexOf(d.id)>=0); return '<button type="button" data-date="'+p.date+'" data-i="'+i+'"'+(dis?' disabled':'')+'><b>'+esc(nightFull(p.date))+'</b><small>'+esc(dayNote(p,d.id))+'</small></button>'; }).join('')+'</div>'
+    +'<button type="button" class="big-btn ghost" id="wantCancel" style="width:100%;margin-top:6px">算了</button>');
+  $('wantCancel').onclick=closeSheet;
+  Array.prototype.forEach.call($('sheetBody').querySelectorAll('.daypick button'), function(b){ b.onclick=function(){
+    var date=b.getAttribute('data-date'), i=Number(b.getAttribute('data-i'));
+    Array.prototype.forEach.call($('sheetBody').querySelectorAll('.daypick button'), function(x){ x.disabled=true; });
+    api('/api/dinner/add',{method:'POST',json:{who:role,date:date,dishId:d.id}}).then(function(){ return loadState(); }).then(function(){
+      var p=planByDate(date), all=cookNames(p);
+      openSheet('<h3>✓ 排好了</h3><div class="bigdone">'+esc(nightFull(date))+'<br>做 '+esc(all||d.name)+'</div>'
+        +'<p class="note" style="text-align:left">'+(role==='mom'?'女儿和小陈会收到通知':'已经告诉妈妈了，也放进了你的心愿单，想包红包可以去那里包')+'</p>'
+        +'<button type="button" class="big-btn primary" id="wantGo" style="width:100%">去'+(role==='mom'?'小饭桌':'点个菜')+'看看</button>'
+        +'<button type="button" class="big-btn ghost" id="wantStay" style="width:100%;margin-top:8px">接着看菜谱</button>');
+      $('wantStay').onclick=closeSheet;
+      $('wantGo').onclick=function(){
+        closeSheet(); if(i>=SHOW_DAYS) moreDays=true;
+        showView(role==='mom'?'today':'order'); render();
+        setTimeout(function(){ var el=$(role==='mom'?'cookCard':'momSaid'); if(el){ var nav=$('nav'), off=(nav?nav.getBoundingClientRect().height:0)+12; window.scrollTo({top:Math.max(0, el.getBoundingClientRect().top+window.pageYOffset-off), behavior:'smooth'}); } },60);
+      };
+    }).catch(function(e){ closeSheet(); toast(e.message||'没排上，请再试一次'); });
+  }; });
+}
 function recipeAction(a, d, el, li){
   var ing=(d.ingredients||[]).slice();
+  if(a==='want'){ openWant(d); return; }
   if(a==='toggle'){ expandedId=expandedId===d.id?null:d.id; pendingDelete=null; renderRecipes(); return; }
   if(a==='rming'){ var x=el.getAttribute('data-x'); saveIngredients(d, ing.filter(function(y){ return y!==x; })); return; }
   if(a==='buy'){ var bx=el.getAttribute('data-x'), it=openItem(bx); if(it) act(api('/api/shopping',{method:'POST',json:{op:'remove',id:it.id}}),'从要买里拿掉了'); else shopAdd([bx], d.name); return; }
