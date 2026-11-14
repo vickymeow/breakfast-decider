@@ -31,10 +31,16 @@ const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*";
 const AUTO_PICK_HOUR = Number(Deno.env.get("AUTO_PICK_HOUR") || "6");
 // ---- Qwen（阿里云百炼）----
 // 新加坡/国际站默认地址；国内站改成 https://dashscope.aliyuncs.com/compatible-mode/v1
-const DASHSCOPE_API_KEY = Deno.env.get("DASHSCOPE_API_KEY") || "";
-const DASHSCOPE_BASE_URL = (Deno.env.get("DASHSCOPE_BASE_URL") || "https://dashscope-intl.aliyuncs.com/compatible-mode/v1").replace(/\/+$/, "");
+const DASHSCOPE_API_KEY = (Deno.env.get("DASHSCOPE_API_KEY") || "").trim();
+// Token Plan 套餐的 key 以 sk-sp- 开头，必须走套餐专属地址；普通 key 走通用地址
+const IS_TOKEN_PLAN = DASHSCOPE_API_KEY.startsWith("sk-sp-");
+const DEFAULT_BASE = IS_TOKEN_PLAN ? "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1" : "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
+const DASHSCOPE_BASE_URL = (Deno.env.get("DASHSCOPE_BASE_URL") || DEFAULT_BASE).replace(/\/+$/, "");
 const QWEN_ASR_MODEL = Deno.env.get("QWEN_ASR_MODEL") || "qwen3-asr-flash";
 const QWEN_CHAT_MODEL = Deno.env.get("QWEN_CHAT_MODEL") || "qwen-flash";
+// 语音识别可以单独用另一把 key / 地址（套餐若不含 ASR 模型时用按量付费的普通 key）
+const ASR_API_KEY = (Deno.env.get("QWEN_ASR_API_KEY") || DASHSCOPE_API_KEY).trim();
+const ASR_BASE_URL = (Deno.env.get("QWEN_ASR_BASE_URL") || (ASR_API_KEY.startsWith("sk-sp-") ? "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1" : (Deno.env.get("QWEN_ASR_API_KEY") ? "https://dashscope-intl.aliyuncs.com/compatible-mode/v1" : DASHSCOPE_BASE_URL))).replace(/\/+$/, "");
 
 type Cat = "breakfast" | "dinner";
 type Dish = {
@@ -180,7 +186,7 @@ async function qwenTranscribe(bytes: Uint8Array, contentType: string): Promise<s
     ],
     asr_options: { enable_itn: false, language: "zh" },
   };
-  const r = await fetch(`${DASHSCOPE_BASE_URL}/chat/completions`, { method: "POST", headers: { authorization: `Bearer ${DASHSCOPE_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+  const r = await fetch(`${ASR_BASE_URL}/chat/completions`, { method: "POST", headers: { authorization: `Bearer ${ASR_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify(body) });
   const txt = await r.text();
   if (!r.ok) { console.error("qwen asr failed", r.status, txt.slice(0, 500)); throw new Error("asr"); }
   const out = JSON.parse(txt);
@@ -236,12 +242,12 @@ Deno.serve(async (req: Request) => {
   if (m === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders() });
 
   try {
-    if (m === "GET" && path === "/") return json({ ok: true, hint: "这是早饭决定器的接口；网页请打开 GitHub Pages 的地址。", qwenKey: DASHSCOPE_API_KEY ? "已配置" : "没有读到 DASHSCOPE_API_KEY", qwenBase: DASHSCOPE_BASE_URL, asrModel: QWEN_ASR_MODEL, chatModel: QWEN_CHAT_MODEL });
+    if (m === "GET" && path === "/") return json({ ok: true, hint: "这是早饭决定器的接口；网页请打开 GitHub Pages 的地址。", qwenKey: DASHSCOPE_API_KEY ? "已配置" : "没有读到 DASHSCOPE_API_KEY", tokenPlan: IS_TOKEN_PLAN, qwenBase: DASHSCOPE_BASE_URL, asrBase: ASR_BASE_URL, asrModel: QWEN_ASR_MODEL, chatModel: QWEN_CHAT_MODEL });
 
     // 自检：key 的样子 + 几个地址哪个认这把 key（不泄露 key 本身）
     if (m === "GET" && path === "/api/qwen-check") {
       const k = DASHSCOPE_API_KEY;
-      const bases = [DASHSCOPE_BASE_URL, "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "https://dashscope.aliyuncs.com/compatible-mode/v1", "https://dashscope-us.aliyuncs.com/compatible-mode/v1"].filter((b, i, a) => a.indexOf(b) === i);
+      const bases = [DASHSCOPE_BASE_URL, "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "https://dashscope.aliyuncs.com/compatible-mode/v1"].filter((b, i, a) => a.indexOf(b) === i);
       const results = [];
       for (const b of bases) {
         try {
@@ -250,7 +256,13 @@ Deno.serve(async (req: Request) => {
           results.push({ base: b, status: r.status, ok: r.ok, snippet: t.slice(0, 160) });
         } catch (e) { results.push({ base: b, status: 0, ok: false, snippet: String(e).slice(0, 160) }); }
       }
-      return json({ keyLength: k.length, keyStartsWith: k.slice(0, 3), keyHasWhitespace: /\s/.test(k), keyHasQuotes: /["'“”‘’]/.test(k), results });
+      // 再用主地址真跑一次最小对话，看套餐是否放行这个模型
+      let chat: unknown = null;
+      try {
+        const r = await fetch(`${DASHSCOPE_BASE_URL}/chat/completions`, { method: "POST", headers: { authorization: `Bearer ${k}`, "content-type": "application/json" }, body: JSON.stringify({ model: QWEN_CHAT_MODEL, enable_thinking: false, messages: [{ role: "user", content: "回复：好" }] }) });
+        chat = { status: r.status, snippet: (await r.text()).slice(0, 200) };
+      } catch (e) { chat = { status: 0, snippet: String(e).slice(0, 160) }; }
+      return json({ keyLength: k.length, keyStartsWith: k.slice(0, 6), tokenPlan: IS_TOKEN_PLAN, usingBase: DASHSCOPE_BASE_URL, asrBase: ASR_BASE_URL, keyHasWhitespace: /\s/.test(k), keyHasQuotes: /["'“”‘’]/.test(k), results, chatTest: chat });
     }
 
     if (m === "GET" && path === "/api/state") {

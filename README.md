@@ -49,7 +49,7 @@ supabase/migrations/...sql             一张表（一行 JSON）+ 一个公开�
 2. 仓库 Settings → Pages → Source 选 `main` 分支的 `/docs` 目录。
 3. 一分钟后打开 `https://<你的用户名>.github.io/<仓库名>/`，把这个链接发给家人。
 
-可选：在 Supabase 后台 Edge Functions → Secrets 添加 `DASHSCOPE_API_KEY`（阿里云百炼 / Model Studio 的 key），就同时开启后端语音识别（`qwen3-asr-flash`）和 AI 填食材（`qwen-flash`）。国际站默认新加坡地址，国内站把 `DASHSCOPE_BASE_URL` 设成 `https://dashscope.aliyuncs.com/compatible-mode/v1`；模型可用 `QWEN_ASR_MODEL`、`QWEN_CHAT_MODEL` 改。不配也能用。函数环境变量 `ALLOWED_ORIGIN` 设成你的 Pages 地址（如 `https://xxx.github.io`）可以限制只有这个网页能调接口；`BREAKFAST_TZ`（默认 `Asia/Shanghai`）只在手机没传日期时兜底用。
+可选：在 Supabase 后台 Edge Functions → Secrets 添加 `DASHSCOPE_API_KEY`（阿里云百炼 / Model Studio 的 key），就同时开启后端语音识别（`qwen3-asr-flash`）和 AI 填食材（`qwen-flash`）。Token Plan 套餐的 key（`sk-sp-` 开头）会自动走套餐地址；普通 key 默认走国际站新加坡地址，国内站把 `DASHSCOPE_BASE_URL` 设成 `https://dashscope.aliyuncs.com/compatible-mode/v1`。套餐不含语音模型时，可以另配一把按量付费的 `QWEN_ASR_API_KEY` 只给语音用。模型可用 `QWEN_ASR_MODEL`、`QWEN_CHAT_MODEL` 改。打开 `<接口地址>/api/qwen-check` 能自检 key 和地址。不配也能用。函数环境变量 `ALLOWED_ORIGIN` 设成你的 Pages 地址（如 `https://xxx.github.io`）可以限制只有这个网页能调接口；`BREAKFAST_TZ`（默认 `Asia/Shanghai`）只在手机没传日期时兜底用。
 
 ## 给老人手机装上
 
