@@ -585,7 +585,9 @@ function renderShop(){
   $('btnClearDone').hidden=!done.length;
   // 下单
   var od=state.order||null, ob=$('orderBox');
-  $('btnOrder').hidden=!(loaded&&open.length&&!(od&&od.status==='pending'));
+  // 后端还没有下单接口时（返回里没有 order 字段）不显示按钮，免得点了报错
+  var orderReady = loaded && Object.prototype.hasOwnProperty.call(state,'order');
+  $('btnOrder').hidden=!(orderReady&&open.length&&!(od&&od.status==='pending'));
   if(!od){ ob.hidden=true; }
   else {
     ob.hidden=false;
