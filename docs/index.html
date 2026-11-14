@@ -218,7 +218,7 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
 <section id="view-shop" class="view">
   <h2 class="sec" style="margin-top:6px">要买的东西 <small id="shopCount"></small></h2>
   <form class="add-row" id="shopForm">
-    <input id="shopInput" placeholder="说一句或打字，比如：牛奶 鸡蛋" autocomplete="off">
+    <input id="shopInput" placeholder="要买什么？按 🎤 说一句" autocomplete="off">
     <button type="button" id="btnShopVoice" class="mic">🎤</button>
     <button type="submit" class="big-btn">加</button>
   </form>
@@ -226,7 +226,7 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
   <div class="chips" id="frequentChips" style="margin-bottom:12px"></div>
   <div id="shopList"></div>
   <button type="button" id="btnClearDone" class="big-btn ghost" style="width:100%" hidden>清空已买的</button>
-  <h2 class="sec">按菜加 <small>点一道菜，再点它的食材</small></h2>
+  <h2 class="sec" id="shopSecTitle" hidden>按菜加 <small>点一道菜，再点它的食材</small></h2>
   <div class="chips" id="dishChips"></div>
   <div id="planBox" class="box" hidden style="margin-top:10px"></div>
 </section>
@@ -519,8 +519,12 @@ function openItem(name){ var l=state.shopping||[]; for(var i=0;i<l.length;i++) i
 function shopAdd(names, from){ names=names.filter(Boolean); if(!names.length) return Promise.resolve(); return act(api('/api/shopping',{method:'POST',json:{op:'add',names:names,from:from||''}}), names.length>1?'加了 '+names.length+' 样':'加了：'+names[0]); }
 var shopOpen=null;   // 买菜页里展开的那道菜；null 时默认展开已定要做的
 function renderShop(){
-  // 1) 哪些菜排前面：已定要做的 > 心愿单里的 > 拿手菜 > 其他
+  // 妈妈：不绕「菜」，只看定了要做的菜要用什么，平铺点选；女儿小陈：可以按菜浏览
+  var simple = role==='mom';
   var planned={}; plannedGroups().forEach(function(g){ g.dishes.forEach(function(d){ if(!planned[d.id]) planned[d.id]=g.label; }); });
+  var title=$('shopSecTitle');
+  if(simple){ title.hidden=!Object.keys(planned).length; title.innerHTML='做饭要用的 <small>点一下就进清单</small>'; $('dishChips').hidden=true; shopOpen=null; }
+  else { title.hidden=false; title.innerHTML='按菜加 <small>点一道菜，再点它的食材</small>'; $('dishChips').hidden=false; }
   var wished={}; (state.wishes||[]).forEach(function(w){ if(w.status!=='done') wished[w.dishId]=true; });
   var all=(state.dishes||[]).slice().sort(function(a,b){
     var ra=planned[a.id]?0:wished[a.id]?1:(a.mom&&a.cat==='dinner')?2:3, rb=planned[b.id]?0:wished[b.id]?1:(b.mom&&b.cat==='dinner')?2:3;
@@ -528,7 +532,8 @@ function renderShop(){
   });
   var openIds = shopOpen!=null ? [shopOpen] : Object.keys(planned).map(Number);
   var chips=$('dishChips');
-  if(!loaded) chips.innerHTML='<p class="note">正在打开…</p>';
+  if(simple) chips.innerHTML='';
+  else if(!loaded) chips.innerHTML='<p class="note">正在打开…</p>';
   else if(!all.length) chips.innerHTML='<p class="note">菜谱还是空的</p>';
   else chips.innerHTML=all.map(function(d){ var on=openIds.indexOf(d.id)>=0; var tag=planned[d.id]?'<span class="tag">'+esc(planned[d.id])+'</span>':wished[d.id]?'<span class="tag" style="background:var(--good)">想吃</span>':''; return '<button type="button" data-id="'+d.id+'" class="'+(on?'on':'')+'">'+esc(d.emoji||'')+' '+esc(d.name)+tag+'</button>'; }).join('');
   Array.prototype.forEach.call(chips.querySelectorAll('button'), function(b){ b.onclick=function(){ var id=Number(b.getAttribute('data-id')); shopOpen = (shopOpen===id) ? -1 : id; renderShop(); }; });
@@ -557,7 +562,7 @@ function renderShop(){
   $('frequentChips').innerHTML=fq.map(function(n){ return '<button type="button" data-n="'+esc(n)+'">＋ '+esc(n)+'</button>'; }).join('');
   Array.prototype.forEach.call($('frequentChips').querySelectorAll('button'), function(b){ b.onclick=function(){ shopAdd([b.getAttribute('data-n')]); }; });
   function row(it){ return '<button type="button" class="shop-item'+(it.done?' done':'')+'" data-id="'+it.id+'"><span class="bx">'+(it.done?'✓':'')+'</span><span class="nm">'+esc(it.name)+(it.from?'<small>'+esc(it.from)+'</small>':'')+'</span></button>'; }
-  $('shopList').innerHTML=(open.length||done.length)?open.map(row).join('')+(done.length?'<h3 class="sec">买到了</h3>'+done.map(row).join(''):''):(loaded?'<p class="note">清单是空的。说一句要买什么，或者在下面点一道菜加它的食材</p>':'');
+  $('shopList').innerHTML=(open.length||done.length)?open.map(row).join('')+(done.length?'<h3 class="sec">买到了</h3>'+done.map(row).join(''):''):(loaded?'<p class="note">清单是空的。按 🎤 说一句要买什么就行'+(simple?'':'，或者在下面点一道菜加它的食材')+'</p>':'');
   Array.prototype.forEach.call($('shopList').querySelectorAll('.shop-item'), function(b){ b.onclick=function(){ act(api('/api/shopping',{method:'POST',json:{op:'toggle',id:Number(b.getAttribute('data-id'))}})); }; });
   $('btnClearDone').hidden=!done.length;
 }
