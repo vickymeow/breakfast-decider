@@ -139,6 +139,9 @@ h3.sec{font-size:22px;color:var(--muted);margin:18px 0 8px}
 .plan-dish:first-of-type{border-top:none;padding-top:0}
 .plan-dish .t{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:24px;font-weight:800}
 .plan-dish .t button{margin-left:auto;font-size:19px;padding:8px 12px;border-radius:12px;border:2px solid var(--accent-deep);background:var(--paper);flex-shrink:0}
+.shop-row{display:flex;align-items:stretch;gap:8px;margin-bottom:8px}
+.shop-row .shop-item{margin:0;flex:1;min-width:0}
+.shop-row .store{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 14px;border-radius:18px;border:3px solid #2e7d32;background:var(--good-soft);color:#1b5e20;font-size:20px;font-weight:800;text-decoration:none;white-space:nowrap}
 .shop-item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--paper);border:3px solid var(--line);border-radius:18px;padding:12px 14px;margin-bottom:8px;font-size:26px;font-weight:700}
 .shop-item .bx{width:38px;height:38px;border-radius:50%;border:3px solid var(--accent-deep);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:24px;background:var(--bg)}
 .shop-item .nm{flex:1;min-width:0;overflow-wrap:anywhere}
@@ -565,7 +568,13 @@ function renderShop(){
   var fq=(state.frequent||[]).filter(function(n){ return !openItem(n); }).slice(0,8);
   $('frequentChips').innerHTML=fq.map(function(n){ return '<button type="button" data-n="'+esc(n)+'">＋ '+esc(n)+'</button>'; }).join('');
   Array.prototype.forEach.call($('frequentChips').querySelectorAll('button'), function(b){ b.onclick=function(){ shopAdd([b.getAttribute('data-n')]); }; });
-  function row(it){ return '<button type="button" class="shop-item'+(it.done?' done':'')+'" data-id="'+it.id+'"><span class="bx">'+(it.done?'✓':'')+'</span><span class="nm">'+esc(it.name)+(it.from?'<small>'+esc(it.from)+'</small>':'')+'</span></button>'; }
+  var store=window.STORE&&window.STORE.search?window.STORE:null;
+  function row(it){
+    var btn='<button type="button" class="shop-item'+(it.done?' done':'')+'" data-id="'+it.id+'"><span class="bx">'+(it.done?'✓':'')+'</span><span class="nm">'+esc(it.name)+(it.from?'<small>'+esc(it.from)+'</small>':'')+'</span></button>';
+    if(!store||it.done) return btn;
+    var href=store.search.replace('{q}', encodeURIComponent(it.name));
+    return '<div class="shop-row">'+btn+'<a class="store" href="'+esc(href)+'" target="_blank" rel="noopener">🛒 '+esc(store.name)+'</a></div>';
+  }
   $('shopList').innerHTML=(open.length||done.length)?open.map(row).join('')+(done.length?'<h3 class="sec">买到了</h3>'+done.map(row).join(''):''):(loaded?'<p class="note">清单是空的。按 🎤 说一句要买什么就行'+(simple?'':'，或者在下面点一道菜加它的食材')+'</p>':'');
   Array.prototype.forEach.call($('shopList').querySelectorAll('.shop-item'), function(b){ b.onclick=function(){ act(api('/api/shopping',{method:'POST',json:{op:'toggle',id:Number(b.getAttribute('data-id'))}})); }; });
   $('btnClearDone').hidden=!done.length;
