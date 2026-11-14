@@ -236,7 +236,7 @@ Deno.serve(async (req: Request) => {
   if (m === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders() });
 
   try {
-    if (m === "GET" && path === "/") return json({ ok: true, hint: "这是早饭决定器的接口；网页请打开 GitHub Pages 的地址。" });
+    if (m === "GET" && path === "/") return json({ ok: true, hint: "这是早饭决定器的接口；网页请打开 GitHub Pages 的地址。", qwenKey: DASHSCOPE_API_KEY ? "已配置" : "没有读到 DASHSCOPE_API_KEY", qwenBase: DASHSCOPE_BASE_URL, asrModel: QWEN_ASR_MODEL, chatModel: QWEN_CHAT_MODEL });
 
     if (m === "GET" && path === "/api/state") {
       let { db, changed } = await loadDb();
