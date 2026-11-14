@@ -5,4 +5,4 @@ window.BREAKFAST_API = "https://jnrceiwidetzijmdbczs.supabase.co/functions/v1/br
 // 不想要就把 search 改成空字符串。换别的店改这里即可。
 window.STORE = { name: "Weee", search: "https://www.sayweee.com/en/search?keyword={q}" };
 // 红包：点菜时可选的金额；unit 是金额前面的符号（比如 "¥" 或 "$"），留空就只显示数字
-window.HONGBAO = { unit: "", amounts: [5, 10, 20, 50, 100] };
+window.HONGBAO = { unit: "¥", amounts: [5, 10, 20, 50, 100] };

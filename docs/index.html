@@ -248,7 +248,7 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
   <button type="button" id="btnOrderSuggest" class="big-btn ghost" style="width:100%" hidden>✨ 不知道吃啥？推荐几道新菜</button>
   <p id="orderSuggestStatus" class="note"></p>
   <div id="orderSuggest"></div>
-  <h3 class="sec">心愿单 <small style="font-size:17px;font-weight:400">红包多的排前面</small></h3>
+  <h3 class="sec">心愿单 <small style="font-size:17px;font-weight:400">想鼓励妈妈就点「🧧 包红包」，红包多的排前面</small></h3>
   <div id="wishList"></div>
 </section>
 
@@ -488,7 +488,9 @@ function dinnerStatus(plan, who){
   return {k:'maybe',t:'还没说',s:'还没说'};
 }
 function openWishesOf(who){ return (state.wishes||[]).filter(function(w){ return w.who===who && w.status!=='done'; }); }
-function cookNames(plan){ if(!plan||!plan.cook) return ''; var ns=(plan.cook.dishIds||[]).map(dishById).filter(Boolean).map(function(d){ return d.name; }); if(plan.cook.text) ns.push(plan.cook.text); return ns.join('＋'); }
+var UNSURE='还没想好';
+function isUnsure(plan){ return !!(plan&&plan.cook&&!(plan.cook.dishIds||[]).length&&plan.cook.text===UNSURE); }
+function cookNames(plan){ if(!plan||!plan.cook||isUnsure(plan)) return ''; var ns=(plan.cook.dishIds||[]).map(dishById).filter(Boolean).map(function(d){ return d.name; }); if(plan.cook.text) ns.push(plan.cook.text); return ns.join('＋'); }
 var dinnerSpeak='';
 function renderDinner(){
   var days=planDays(), plan=days[0], d0=plan.date, lab0=nightLabel(d0);
@@ -513,17 +515,17 @@ function renderDinner(){
   // 明晚、后天：一行看清 哪天（周几）、做什么、谁回来
   function dayRow(p){
     var c=cookNames(p), who=MEMBERS.map(function(m){ return PEOPLE[m].name+dinnerStatus(p,m).s; }).join(' · ');
-    return '<div class="tmr"><div class="dl"><b>'+esc(nightFull(p.date))+'</b>：'+(c?'<b>'+esc(c)+'</b>':'还没想好')+' <button type="button" class="big-btn ghost sm" data-date="'+p.date+'">'+(c?'改':'定一下')+'</button></div><div class="dw">'+esc(who)+'</div></div>';
+    return '<div class="tmr"><div class="dl"><b>'+esc(nightFull(p.date))+'</b>：'+(c?'<b>'+esc(c)+'</b>':isUnsure(p)?'妈妈还没想好':'还没定')+' <button type="button" class="big-btn ghost sm" data-date="'+p.date+'">'+(c?'改':'定一下')+'</button></div><div class="dw">'+esc(who)+'</div></div>';
   }
   $('cookCard').innerHTML='<div class="lab">'+esc(nightFull(d0))+' 做</div>'
-    +'<div class="txt'+(cn?'':' none')+'">'+(cn?esc(cn):'还没定')+'</div>'
+    +'<div class="txt'+(cn?'':' none')+'">'+(cn?esc(cn):isUnsure(plan)?'还没想好，想好了再定':'还没定')+'</div>'
     +(forWho.length?'<div class="for">'+esc(forWho.join('和'))+'想吃的 ✓'+(forHb?' <span class="hb">'+hbText(forHb)+'</span>':'')+'</div>':'')
     +materials()
     +'<button type="button" class="big-btn'+(cn?' ghost':' primary')+'" data-date="'+d0+'" style="width:100%">'+(cn?'换一个':'定'+lab0+'做什么')+'</button>'
     +dayRow(days[1])+dayRow(days[2]);
   Array.prototype.forEach.call($('cookCard').querySelectorAll('button'), function(b){ b.onclick=function(){ if(b.getAttribute('data-goshop')){ showView('shop'); window.scrollTo(0,0); return; } openChooser(b.getAttribute('data-date')); }; });
   var c1=cookNames(days[1]);
-  dinnerSpeak=lab0+n+'个人回来吃。'+lines.join('。')+'。'+(cn?lab0+'做'+cn.replace(/＋/g,'和'):lab0+'还没定做什么')+(c1?'。'+nightLabel(days[1].date)+'做'+c1.replace(/＋/g,'和'):'');
+  dinnerSpeak=lab0+n+'个人回来吃。'+lines.join('。')+'。'+(cn?lab0+'做'+cn.replace(/＋/g,'和'):lab0+(isUnsure(plan)?'还没想好做什么':'还没定做什么'))+(c1?'。'+nightLabel(days[1].date)+'做'+c1.replace(/＋/g,'和'):'');
   renderChooser();
 }
 // 做过的菜收到的红包（妈妈看）
@@ -534,10 +536,10 @@ function renderHbBox(){
   box.innerHTML='<h3>🧧 谢谢妈妈的红包</h3>'+l.map(function(w){ var d=dishById(w.dishId); return '<div class="person"><span class="who">'+av(w.who)+' '+esc(PEOPLE[w.who].name)+'</span><span class="pw">'+esc(d?d.name:'菜')+' <span class="hb">'+hbText(w.hb)+'</span></span><span class="st '+(w.hbPaid?'yes':'maybe')+'">'+(w.hbPaid?'已发':'还没发')+'</span></div>'; }).join('');
 }
 function planByDate(date){ var ds=planDays(); for(var i=0;i<ds.length;i++) if(ds[i].date===date) return ds[i]; return null; }
-function openChooser(date){ var plan=planByDate(date); chooser={date:date, sel:(plan&&plan.cook?plan.cook.dishIds.slice():[]), text:(plan&&plan.cook?plan.cook.text:'')}; renderChooser(); setTimeout(function(){ $('chooser').scrollIntoView({behavior:'smooth',block:'start'}); },50); }
+function openChooser(date){ var plan=planByDate(date); chooser={date:date, sel:(plan&&plan.cook?plan.cook.dishIds.slice():[]), text:(plan&&plan.cook&&!isUnsure(plan)?plan.cook.text:'')}; renderChooser(); setTimeout(function(){ $('chooser').scrollIntoView({behavior:'smooth',block:'start'}); },50); }
 function renderChooser(){
   var box=$('chooser'); if(!chooser){ box.hidden=true; return; } box.hidden=false;
-  var date=chooser.date, label=nightLabel(date), cp=planByDate(date), hadCook=!!(cp&&cp.cook);
+  var date=chooser.date, label=nightLabel(date);
   var dinnerDishes=dishesOf('dinner');
   var wishIds=[]; var wishMeta={};
   (state.wishes||[]).forEach(function(w){ if(w.status==='done'||!PEOPLE[w.who]) return; if(wishIds.indexOf(w.dishId)<0) wishIds.push(w.dishId); var m=wishMeta[w.dishId]||(wishMeta[w.dishId]={who:[],days:0,hb:0}); if(m.who.indexOf(PEOPLE[w.who].name)<0) m.who.push(PEOPLE[w.who].name); m.days=Math.max(m.days,daysSince(w.at)); m.hb+=w.hb||0; });
@@ -552,7 +554,7 @@ function renderChooser(){
     +(momChips?'<h4>拿手菜</h4><div class="chips">'+momChips+'</div>':'')
     +(otherChips?'<h4>其他</h4><div class="chips">'+otherChips+'</div>':'')
     +'<h4>别的</h4><div class="add-row"><input id="chooserInput" placeholder="说一句或打字" autocomplete="off" value="'+esc(chooser.text||'')+'"><button type="button" id="chooserVoice" class="mic">🎤</button></div><p class="note" id="chooserStatus" style="text-align:left"></p>'
-    +'<div class="row" style="margin-top:12px"><button type="button" class="big-btn primary" id="chooserOk">就这么定</button><button type="button" class="big-btn danger" id="chooserNo">不做饭</button>'+(hadCook?'<button type="button" class="big-btn ghost" id="chooserUndo">先不定</button>':'')+'<button type="button" class="big-btn ghost" id="chooserCancel">取消</button></div>';
+    +'<div class="row" style="margin-top:12px"><button type="button" class="big-btn primary" id="chooserOk">就这么定</button><button type="button" class="big-btn danger" id="chooserNo">不做饭</button><button type="button" class="big-btn ghost" id="chooserUndo">没想好</button><button type="button" class="big-btn ghost" id="chooserCancel">取消</button></div>';
   Array.prototype.forEach.call(box.querySelectorAll('.chips button'), function(b){ b.onclick=function(){ var id=Number(b.getAttribute('data-id')), k=chooser.sel.indexOf(id); if(k>=0) chooser.sel.splice(k,1); else chooser.sel.push(id); renderChooser(); }; });
   $('chooserVoice').onclick=function(){ voiceCapture({btn:$('chooserVoice'),status:$('chooserStatus'),input:$('chooserInput'),onText:function(t){ $('chooserInput').value=cleanName(t); }}); };
   $('chooserOk').onclick=function(){
@@ -564,7 +566,7 @@ function renderChooser(){
     act(p.then(function(){ return api('/api/dinner/cook',{method:'POST',json:{date:date,dishIds:sel,text:''}}); }), '定好了，大家都能看到');
   };
   $('chooserNo').onclick=function(){ chooser=null; act(api('/api/dinner/cook',{method:'POST',json:{date:date,dishIds:[],text:'不做饭，各自解决'}}),'好，'+label+'不做饭'); };
-  if(hadCook) $('chooserUndo').onclick=function(){ chooser=null; act(api('/api/dinner/cook',{method:'POST',json:{date:date,dishIds:[],text:''}}),label+'先不定，想好了再来'); };
+  $('chooserUndo').onclick=function(){ chooser=null; act(api('/api/dinner/cook',{method:'POST',json:{date:date,dishIds:[],text:UNSURE}}),label+'先不定，大家会看到你还没想好'); };
   $('chooserCancel').onclick=function(){ chooser=null; renderChooser(); };
 }
 // 下午 1 点以后先关心晚饭：页面顺序和朗读顺序都跟着这个
@@ -582,7 +584,7 @@ function renderOrder(){
     return '<div class="hrow"><div class="hl">'+esc(nightLabel(p.date))+' <small>'+esc(dateLabel(p.date).replace(/^今天 |^明天 /,''))+'</small></div><div class="home-row three">'+b('1','yes','🏠 回来吃')+b('0','no','🚶 不回来')+b('x','maybe','🤔 没想好')+'</div></div>';
   }).join('');
   Array.prototype.forEach.call($('homeRows').querySelectorAll('button'), function(b){ b.onclick=function(){ var h=b.getAttribute('data-home'); act(api('/api/dinner/reply',{method:'POST',json:{who:role,date:b.getAttribute('data-date'),home:h==='1'?true:h==='0'?false:null}}),'告诉妈妈了'); }; });
-  $('momSaid').innerHTML='<h3>妈妈说</h3>'+days.map(function(p,i){ var c=cookNames(p); return '<div style="font-size:'+(i?22:30)+'px;font-weight:'+(i?400:800)+';'+(i?'color:var(--muted);margin-top:6px':'')+'">'+esc(nightFull(p.date))+'：'+(c?esc(c):'<span style="color:var(--muted);font-weight:400;font-size:22px">还没定</span>')+'</div>'; }).join('');
+  $('momSaid').innerHTML='<h3>妈妈说</h3>'+days.map(function(p,i){ var c=cookNames(p); return '<div style="font-size:'+(i?22:30)+'px;font-weight:'+(i?400:800)+';'+(i?'color:var(--muted);margin-top:6px':'')+'">'+esc(nightFull(p.date))+'：'+(c?esc(c):'<span style="color:var(--muted);font-weight:400;font-size:22px">'+(isUnsure(p)?'妈妈还没想好':'还没定')+'</span>')+'</div>'; }).join('');
   // 菜库里点：红包多的在前，其次妈妈的拿手菜
   var mine={}; openWishesOf(role).forEach(function(w){ mine[w.dishId]=w; });
   var list=dishesOf('dinner').slice().sort(function(a,b){ return (hbTotal(b.id)-hbTotal(a.id)) || ((b.mom?1:0)-(a.mom?1:0)); });
@@ -606,12 +608,11 @@ function renderOrder(){
     else act(api('/api/wishes/'+b.getAttribute('data-wid')+'/remove',{method:'POST'}),'取消了');
   }; });
 }
-// 点一道菜：点好后顺手问要不要包红包
+// 点一道菜（红包不打断：想包时在下面心愿单里点「🧧 包红包」）
 function orderWish(json, name){
   return api('/api/wishes',{method:'POST',json:json}).then(function(r){
     toast('点好了'+(name?'：'+name:'')+'，妈妈会看到');
-    var did=r.dish&&r.dish.id, w=null; (r.wishes||[]).forEach(function(x){ if(x.dishId===did&&x.who===role&&x.status!=='done') w=x; });
-    return loadState().then(function(){ if(w&&!w.hb) openHb(w.id); return r; });
+    return loadState().then(function(){ return r; });
   }).catch(function(e){ toast(e.message||'没成功，请再试一次'); });
 }
 function wishById(id){ var l=state.wishes||[]; for(var i=0;i<l.length;i++) if(l[i].id===id) return l[i]; return null; }
