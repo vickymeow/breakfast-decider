@@ -74,7 +74,7 @@ h3.sec{font-size:22px;color:var(--muted);margin:18px 0 8px}
 .morning-card .pics.multi .pic .emoji{font-size:90px}
 .morning-card .name{font-size:56px;font-weight:800;padding:16px 10px 6px;overflow-wrap:anywhere;line-height:1.1}
 .morning-card .sub{font-size:24px;color:var(--muted);padding:0 12px 18px}
-#btnSpeak{width:100%;background:var(--accent);font-size:30px;padding:22px}
+#btnSpeak{width:100%;background:var(--accent);font-size:30px;padding:22px;margin:0 0 14px}
 /* 晚饭 */
 .count{font-size:38px;font-weight:800;margin:0 0 6px}
 .count small{display:block;font-size:19px;color:var(--muted);font-weight:400}
@@ -188,14 +188,15 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
 
 <!-- 妈妈：今天 -->
 <section id="view-today" class="view">
+  <button type="button" id="btnSpeak" class="big-btn">🔊 读给我听</button>
+  <div id="todayBody">
   <h2 class="sec" id="bfSec">早饭 <small id="bfDate"></small></h2>
   <div id="morningCard" class="morning-card"></div>
-  <button type="button" id="btnSpeak" class="big-btn">🔊 读给我听</button>
   <h2 class="sec" id="dnSec">晚饭 <small id="dnDate"></small></h2>
   <div id="dinnerBoard" class="box"></div>
   <div id="cookCard" class="cook-card"></div>
   <div id="chooser" class="chooser" hidden></div>
-  <button type="button" id="btnSpeakDinner" class="big-btn ghost" style="width:100%">🔊 读一下晚饭情况</button>
+  </div>
 </section>
 
 <!-- 女儿 / 小陈：点菜 -->
@@ -418,11 +419,11 @@ function morningHtml(){
 function renderMorning(){
   var m=morningHtml(); $('morningCard').innerHTML=m.html; $('bfDate').textContent=dateLabel(targetDate());
   // 下午 1 点以后，妈妈关心的是晚饭：晚饭那块挪到上面
-  var sec=$('view-today'), first=sec.firstElementChild, dinnerFirst=new Date().getHours()>=13;
+  var sec=$('todayBody'), first=sec.firstElementChild;
   var isDinnerFirst = first && first.id==='dnSec';
-  if(dinnerFirst!==isDinnerFirst){
-    var bf=[$('bfSec'),$('morningCard'),$('btnSpeak')], dn=[$('dnSec'),$('dinnerBoard'),$('cookCard'),$('chooser'),$('btnSpeakDinner')];
-    (dinnerFirst?dn.concat(bf):bf.concat(dn)).forEach(function(el){ sec.appendChild(el); });
+  if(dinnerFirst()!==isDinnerFirst){
+    var bf=[$('bfSec'),$('morningCard')], dn=[$('dnSec'),$('dinnerBoard'),$('cookCard'),$('chooser')];
+    (dinnerFirst()?dn.concat(bf):bf.concat(dn)).forEach(function(el){ sec.appendChild(el); });
   }
 }
 
@@ -493,8 +494,9 @@ function renderChooser(){
   $('chooserNo').onclick=function(){ chooser=null; act(api('/api/dinner/cook',{method:'POST',json:{date:date,dishIds:[],text:'不做饭，各自解决'}}),'好，'+label+'不做饭'); };
   $('chooserCancel').onclick=function(){ chooser=null; renderChooser(); };
 }
-$('btnSpeak').onclick=function(){ speak(speakText); };
-$('btnSpeakDinner').onclick=function(){ speak(dinnerSpeak); };
+// 下午 1 点以后先关心晚饭：页面顺序和朗读顺序都跟着这个
+function dinnerFirst(){ return new Date().getHours()>=13; }
+$('btnSpeak').onclick=function(){ speak(dinnerFirst() ? dinnerSpeak+'。'+speakText : speakText+'。'+dinnerSpeak); };
 
 // 点菜（女儿 / 小陈）
 function renderOrder(){
@@ -726,6 +728,22 @@ if(PEOPLE[saved]) applyRole(saved); else $('who').hidden=false;
 
 loadState();
 setInterval(loadState, 10000);
+// 网页有新版本就自己刷新一次（GitHub Pages 和手机都会缓存旧页面）
+var verReloaded=false;
+function checkVersion(){
+  fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(v){
+    v=(v||'').trim(); if(!v||v.length>40) return;
+    var old=load('bf_ver');
+    if(old===v) return;
+    store('bf_ver', v);
+    if(!old||verReloaded||uiBusy()) return;   // 第一次只记下来；正在打字就别刷
+    verReloaded=true;
+    Promise.all([fetch('index.html',{cache:'reload'}),fetch('config.js',{cache:'reload'})]).catch(function(){}).then(function(){ location.reload(); });
+  }).catch(function(){});
+}
+checkVersion();
+setInterval(checkVersion, 5*60000);
+document.addEventListener('visibilitychange', function(){ if(!document.hidden) checkVersion(); });
 document.addEventListener('visibilitychange', function(){ if(!document.hidden) loadState(); });
 window.addEventListener('online', loadState);
 setInterval(render, 60000);

@@ -20,7 +20,8 @@ A tiny shared "what's for breakfast" app for a parent and a child. Chinese UI, b
 
 ```
 docs/index.html                        前端（纯 HTML/CSS/JS，没有框架），由 GitHub Pages 托管
-docs/config.js                         只有一行：接口地址，换成你自己的
+docs/config.js                         接口地址和买菜网站，换成你自己的
+docs/version.txt                       网页版本号；改了网页就顺手改一下它，大家的手机会自动刷新到新版
 docs/icon.png, docs/manifest.webmanifest  主屏幕图标与安装信息
 supabase/functions/breakfast/index.ts  后端：Supabase Edge Function，只提供接口
 supabase/migrations/...sql             一张表（一行 JSON）+ 一个公开图片桶
