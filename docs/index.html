@@ -130,6 +130,7 @@ h3.sec{font-size:22px;color:var(--muted);margin:18px 0 8px}
 .detail .acts input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .detail .ing{margin:6px 0 10px}
 /* 买菜 */
+.chips button .tag{font-size:14px;padding:1px 6px;border-radius:999px;background:var(--pick);color:#fff;font-weight:700}
 .plan-dish{border-top:2px solid var(--line);padding:10px 0}
 .plan-dish:first-of-type{border-top:none;padding-top:0}
 .plan-dish .t{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:24px;font-weight:800}
@@ -215,9 +216,7 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
 
 <!-- 买菜（全家） -->
 <section id="view-shop" class="view">
-  <h2 class="sec" style="margin-top:6px">这两天要做的菜 <small>点食材就进清单</small></h2>
-  <div id="planBox" class="box"></div>
-  <h2 class="sec">要买的东西 <small id="shopCount"></small></h2>
+  <h2 class="sec" style="margin-top:6px">要买的东西 <small id="shopCount"></small></h2>
   <form class="add-row" id="shopForm">
     <input id="shopInput" placeholder="说一句或打字，比如：牛奶 鸡蛋" autocomplete="off">
     <button type="button" id="btnShopVoice" class="mic">🎤</button>
@@ -227,6 +226,9 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
   <div class="chips" id="frequentChips" style="margin-bottom:12px"></div>
   <div id="shopList"></div>
   <button type="button" id="btnClearDone" class="big-btn ghost" style="width:100%" hidden>清空已买的</button>
+  <h2 class="sec">按菜加 <small>点一道菜，再点它的食材</small></h2>
+  <div class="chips" id="dishChips"></div>
+  <div id="planBox" class="box" hidden style="margin-top:10px"></div>
 </section>
 
 <!-- 菜谱（全家） -->
@@ -515,16 +517,30 @@ function plannedGroups(){
 }
 function openItem(name){ var l=state.shopping||[]; for(var i=0;i<l.length;i++) if(!l[i].done&&l[i].name===name) return l[i]; return null; }
 function shopAdd(names, from){ names=names.filter(Boolean); if(!names.length) return Promise.resolve(); return act(api('/api/shopping',{method:'POST',json:{op:'add',names:names,from:from||''}}), names.length>1?'加了 '+names.length+' 样':'加了：'+names[0]); }
+var shopOpen=null;   // 买菜页里展开的那道菜；null 时默认展开已定要做的
 function renderShop(){
-  var groups=plannedGroups(), box=$('planBox');
-  if(!loaded) box.innerHTML='<p class="note">正在打开…</p>';
-  else if(!groups.length) box.innerHTML='<p class="note" style="text-align:left;margin:0">还没定要做什么。'+(role==='mom'?'到「今天」页定了晚饭，这里就会列出要买的食材。':'妈妈定了做什么，这里会列出食材。')+'</p>';
-  else box.innerHTML=groups.map(function(g){ return '<h3 class="sec" style="margin:4px 0 8px">'+esc(g.label)+'</h3>'+g.dishes.map(function(d){
-      var ing=d.ingredients||[]; var missing=ing.filter(function(x){ return !openItem(x); });
-      return '<div class="plan-dish" data-id="'+d.id+'"><div class="t">'+esc(d.emoji||'')+' '+esc(d.name)+(ing.length&&missing.length?'<button type="button" data-act="all">都要买</button>':'')+'</div>'
-        +(ing.length?'<div class="chips">'+ing.map(function(x){ var on=!!openItem(x); return '<button type="button" data-ing="'+esc(x)+'" class="'+(on?'on':'')+'">'+(on?'✓ ':'')+esc(x)+'</button>'; }).join('')+'</div>'
-          :'<div class="note" style="text-align:left;margin:0 0 6px">还没填食材</div><div class="row"><button type="button" class="big-btn ghost" data-act="ingvoice">🎤 说食材</button>'+(state.ai?'<button type="button" class="big-btn ghost" data-act="ai">✨ AI 填</button>':'')+'</div><p class="note" data-st style="text-align:left;margin:4px 0 0"></p>')
-        +'</div>'; }).join(''); }).join('');
+  // 1) 哪些菜排前面：已定要做的 > 心愿单里的 > 拿手菜 > 其他
+  var planned={}; plannedGroups().forEach(function(g){ g.dishes.forEach(function(d){ if(!planned[d.id]) planned[d.id]=g.label; }); });
+  var wished={}; (state.wishes||[]).forEach(function(w){ if(w.status!=='done') wished[w.dishId]=true; });
+  var all=(state.dishes||[]).slice().sort(function(a,b){
+    var ra=planned[a.id]?0:wished[a.id]?1:(a.mom&&a.cat==='dinner')?2:3, rb=planned[b.id]?0:wished[b.id]?1:(b.mom&&b.cat==='dinner')?2:3;
+    return ra-rb;
+  });
+  var openIds = shopOpen!=null ? [shopOpen] : Object.keys(planned).map(Number);
+  var chips=$('dishChips');
+  if(!loaded) chips.innerHTML='<p class="note">正在打开…</p>';
+  else if(!all.length) chips.innerHTML='<p class="note">菜谱还是空的</p>';
+  else chips.innerHTML=all.map(function(d){ var on=openIds.indexOf(d.id)>=0; var tag=planned[d.id]?'<span class="tag">'+esc(planned[d.id])+'</span>':wished[d.id]?'<span class="tag" style="background:var(--good)">想吃</span>':''; return '<button type="button" data-id="'+d.id+'" class="'+(on?'on':'')+'">'+esc(d.emoji||'')+' '+esc(d.name)+tag+'</button>'; }).join('');
+  Array.prototype.forEach.call(chips.querySelectorAll('button'), function(b){ b.onclick=function(){ var id=Number(b.getAttribute('data-id')); shopOpen = (shopOpen===id) ? -1 : id; renderShop(); }; });
+  // 2) 展开的菜：食材可点
+  var box=$('planBox'); var openDishes=openIds.map(dishById).filter(Boolean);
+  box.hidden=!openDishes.length;
+  box.innerHTML=openDishes.map(function(d){
+    var ing=d.ingredients||[]; var missing=ing.filter(function(x){ return !openItem(x); });
+    return '<div class="plan-dish" data-id="'+d.id+'"><div class="t">'+esc(d.emoji||'')+' '+esc(d.name)+(planned[d.id]?' <small style="font-size:16px;color:var(--muted);font-weight:400">'+esc(planned[d.id])+'</small>':'')+(ing.length&&missing.length?'<button type="button" data-act="all">都要买</button>':'')+'</div>'
+      +(ing.length?'<div class="chips">'+ing.map(function(x){ var on=!!openItem(x); return '<button type="button" data-ing="'+esc(x)+'" class="'+(on?'on':'')+'">'+(on?'✓ ':'')+esc(x)+'</button>'; }).join('')+'</div>'
+        :'<div class="note" style="text-align:left;margin:0 0 6px">还没填食材</div><div class="row"><button type="button" class="big-btn ghost" data-act="ingvoice">🎤 说食材</button>'+(state.ai?'<button type="button" class="big-btn ghost" data-act="ai">✨ AI 填</button>':'')+'</div><p class="note" data-st style="text-align:left;margin:4px 0 0"></p>')
+      +'</div>'; }).join('');
   Array.prototype.forEach.call(box.querySelectorAll('.plan-dish'), function(el){
     var d=dishById(Number(el.getAttribute('data-id'))); if(!d) return;
     Array.prototype.forEach.call(el.querySelectorAll('[data-ing]'), function(b){ b.onclick=function(){ var x=b.getAttribute('data-ing'), it=openItem(x); if(it) act(api('/api/shopping',{method:'POST',json:{op:'remove',id:it.id}}),'拿掉了'); else shopAdd([x], d.name); }; });
@@ -534,13 +550,14 @@ function renderShop(){
       else if(a==='ai'){ el.querySelector('[data-st]').textContent='AI 正在想…'; api('/api/ingredients',{method:'POST',json:{name:d.name}}).then(function(r){ if(!(r.items||[]).length){ el.querySelector('[data-st]').textContent='AI 没给出食材'; return; } return saveIngredients(d, r.items); }).catch(function(e){ el.querySelector('[data-st]').textContent=e.message||'AI 出错了'; }); }
     }; });
   });
+  // 3) 清单
   var items=(state.shopping||[]).slice(), open=items.filter(function(x){ return !x.done; }), done=items.filter(function(x){ return x.done; });
   $('shopCount').textContent=loaded?(open.length?open.length+' 样':'没有要买的'):'';
   var fq=(state.frequent||[]).filter(function(n){ return !openItem(n); }).slice(0,8);
   $('frequentChips').innerHTML=fq.map(function(n){ return '<button type="button" data-n="'+esc(n)+'">＋ '+esc(n)+'</button>'; }).join('');
   Array.prototype.forEach.call($('frequentChips').querySelectorAll('button'), function(b){ b.onclick=function(){ shopAdd([b.getAttribute('data-n')]); }; });
   function row(it){ return '<button type="button" class="shop-item'+(it.done?' done':'')+'" data-id="'+it.id+'"><span class="bx">'+(it.done?'✓':'')+'</span><span class="nm">'+esc(it.name)+(it.from?'<small>'+esc(it.from)+'</small>':'')+'</span></button>'; }
-  $('shopList').innerHTML=(open.length||done.length)?open.map(row).join('')+(done.length?'<h3 class="sec">买到了</h3>'+done.map(row).join(''):''):(loaded?'<p class="note">清单是空的。上面点食材，或者说一句要买什么</p>':'');
+  $('shopList').innerHTML=(open.length||done.length)?open.map(row).join('')+(done.length?'<h3 class="sec">买到了</h3>'+done.map(row).join(''):''):(loaded?'<p class="note">清单是空的。说一句要买什么，或者在下面点一道菜加它的食材</p>':'');
   Array.prototype.forEach.call($('shopList').querySelectorAll('.shop-item'), function(b){ b.onclick=function(){ act(api('/api/shopping',{method:'POST',json:{op:'toggle',id:Number(b.getAttribute('data-id'))}})); }; });
   $('btnClearDone').hidden=!done.length;
 }
