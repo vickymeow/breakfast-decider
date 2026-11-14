@@ -9,8 +9,12 @@
 //   POST /api/dishes/:id/move   {direction}          早饭排序
 //   POST /api/dishes/:id/photo  （请求体是图片）
 //   DELETE /api/dishes/:id
-//   POST /api/wishes      {dishId | name, who}        点菜进心愿单
+//   POST /api/wishes      {dishId | name, who, hb?}   点菜进心愿单（hb = 红包金额，只是记一笔，钱自己在微信发）
 //   POST /api/wishes/:id/remove
+//   POST /api/wishes/:id/update {hb?, hbPaid?}
+//   POST /api/profile/:who/photo （请求体是图片）     头像
+//   POST /api/feedback    {who, text}                 提意见（存在 feedback 里，不随 state 下发）
+//   POST /api/suggest     {cat}                       Qwen 推荐几道菜单里没有的新菜
 //   POST /api/dinner/reply {who, home, date}          回不回来吃
 //   POST /api/dinner/cook  {date, dishIds, text}      妈妈定今晚/明晚做什么（空 = 取消）
 //   POST /api/shopping    {op:"add", names:[], from?} | {op:"toggle"|"remove", id} | {op:"clear_done"} | {op:"ordered"}   买菜清单（全家共用）
@@ -57,10 +61,15 @@ type Dish = {
 type Pick = { type: "dish" | "random" | "skip"; dish: number | null; dishes?: number[]; resolvedName: string | null; auto?: boolean };
 type Reply = { home: boolean | null; at: string };
 type Plan = { date: string; replies: Record<string, Reply>; cook: { dishIds: number[]; text: string; at: string } | null; done?: boolean };
-type Wish = { id: number; dishId: number; who: string; at: string; status: "open" | "planned" | "done"; plannedFor?: string; doneAt?: string };
+type Wish = { id: number; dishId: number; who: string; at: string; status: "open" | "planned" | "done"; plannedFor?: string; doneAt?: string; hb?: number; hbPaid?: boolean };
+type Feedback = { id: number; who: string; text: string; at: string; done?: boolean };
 type ShopItem = { id: number; name: string; done: boolean; from?: string; at: string; doneAt?: string };
-type Db = { v: number; dishes: Dish[]; pick: Pick | null; pickDate: string | null; plans: Record<string, Plan>; wishes: Wish[]; shopping: ShopItem[]; shopHistory: Record<string, number> };
+type Db = { v: number; dishes: Dish[]; pick: Pick | null; pickDate: string | null; plans: Record<string, Plan>; wishes: Wish[]; shopping: ShopItem[]; shopHistory: Record<string, number>; profiles: Record<string, { avatar?: string }>; feedback: Feedback[]; orderV?: number };
 const MEMBERS = ["kid", "jim"];
+const PEOPLE = ["mom", "kid", "jim"];
+// 家里常备、常买的东西：买菜记录还不多时用它补齐「常买」
+const STAPLES = ["鸡蛋", "牛奶", "青菜", "西红柿", "豆腐", "葱", "姜", "蒜", "大米", "面条", "水果", "面包"];
+const cleanHb = (v: unknown) => { const n = Math.round(Number(v)); return Number.isFinite(n) && n > 0 ? Math.min(n, 9999) : 0; };
 
 const SEED_NAMES: [string, string][] = [["乌冬面","🍜"],["炒荞麦面","🍝"],["馄饨","🥟"],["蒸饺","🥟"],["煎饺","🥟"],["炒饭","🍚"],["吐司","🍞"],["鸡蛋","🥚"]];
 const EMOJI_RULES: [string, string][] = [
@@ -76,7 +85,7 @@ const addDays = (date: string, n: number) => { const d = new Date(date + "T00:00
 
 // ---- 数据读写与迁移 ----
 function fresh(): Db {
-  return { v: 2, dishes: SEED_NAMES.map(([name, emoji], i) => ({ id: i + 1, name, emoji, cat: "breakfast", mom: true, ingredients: [], lastMade: null, times: 0 })), pick: null, pickDate: null, plans: {}, wishes: [], shopping: [], shopHistory: {} };
+  return { v: 2, dishes: SEED_NAMES.map(([name, emoji], i) => ({ id: i + 1, name, emoji, cat: "breakfast", mom: true, ingredients: [], lastMade: null, times: 0 })), pick: null, pickDate: null, plans: {}, wishes: [], shopping: [], shopHistory: {}, profiles: {}, feedback: [], orderV: 1 };
 }
 // 旧结构（v1：dishes 只有早饭；dinner 一份含 wish 文本）升到 v2
 // deno-lint-ignore no-explicit-any
@@ -85,6 +94,14 @@ function migrate(raw: any): { db: Db; changed: boolean } {
     const db = raw as Db; let changed = false;
     if (!Array.isArray(db.shopping)) { db.shopping = []; changed = true; }
     if (!db.shopHistory || typeof db.shopHistory !== "object") { db.shopHistory = {}; changed = true; }
+    if (!db.profiles || typeof db.profiles !== "object") { db.profiles = {}; changed = true; }
+    if (!Array.isArray(db.feedback)) { db.feedback = []; changed = true; }
+    if (!db.orderV) {
+      // 一次性：正餐按「新加的在上面」重排（早饭的手动顺序不动）；之后新菜都插在最前
+      const dinner = db.dishes.filter((d) => d.cat === "dinner").sort((a, b) => b.id - a.id);
+      let k = 0; db.dishes = db.dishes.map((d) => d.cat === "dinner" ? dinner[k++] : d);
+      db.orderV = 1; changed = true;
+    }
     return { db, changed };
   }
   const db: Db = fresh();
@@ -120,7 +137,7 @@ function ensureDish(db: Db, name: string, cat: Cat, by?: string): Dish {
   const found = db.dishes.find((d) => d.name === n);
   if (found) return found;
   const dish: Dish = { id: Date.now() + Math.floor(Math.random() * 1000), name: n, emoji: emojiFor(n), cat, mom: false, ingredients: [], lastMade: null, times: 0, by };
-  db.dishes.push(dish);
+  db.dishes.unshift(dish); // 新加的排在最上面
   return dish;
 }
 function planFor(db: Db, date: string): Plan {
@@ -275,6 +292,30 @@ async function qwenIngredients(name: string): Promise<string[]> {
   return (items as unknown[]).map((x) => String(x).trim()).filter((x) => x && x.length <= 12).slice(0, 12);
 }
 
+async function qwenSuggest(cat: Cat, have: string[]): Promise<{ name: string; ingredients: string[] }[]> {
+  const kind = cat === "breakfast" ? "早饭" : "家常正餐（午饭晚饭的菜）";
+  const sys = `你是中餐家常菜助手，给一家人推荐新菜。推荐 6 道适合在家做的${kind}，要求：菜单里已经有的不要推荐；做法不复杂；食材在美国的华人超市买得到；荤素搭配，口味别都一样。每道菜附上要买的主要食材（不含盐糖油生抽葱姜蒜这类基础调料），每项 2 到 6 个字，3 到 8 项。菜名 2 到 8 个字。只返回 JSON：{"items":[{"name":"菜名","ingredients":["..."]}]}`;
+  const user = "菜单里已经有：" + (have.length ? have.slice(0, 120).join("、") : "（还是空的）");
+  const msgs = [{ role: "system", content: sys }, { role: "user", content: user }];
+  let content = "";
+  try { content = await qwenChat(msgs, { response_format: { type: "json_object" }, temperature: 0.9 }); }
+  catch (e) {
+    if (String(e).includes("response_format") || String(e).includes("400")) content = await qwenChat(msgs, { temperature: 0.9 });
+    else throw e;
+  }
+  let items: unknown = [];
+  try { const j = JSON.parse(content); items = Array.isArray(j) ? j : (j.items || j.dishes || []); }
+  catch { const m = content.match(/\[[\s\S]*\]/); if (m) { try { items = JSON.parse(m[0]); } catch { items = []; } } }
+  const out: { name: string; ingredients: string[] }[] = [];
+  for (const x of (Array.isArray(items) ? items : [])) {
+    // deno-lint-ignore no-explicit-any
+    const o = x as any; const name = String((o && o.name) || (typeof o === "string" ? o : "")).trim().slice(0, 30);
+    if (!name || have.includes(name) || out.some((y) => y.name === name)) continue;
+    out.push({ name, ingredients: cleanList(o && o.ingredients).filter((y) => y.length <= 12).slice(0, 10) });
+  }
+  return out.slice(0, 8);
+}
+
 // ---- 响应 ----
 function corsHeaders(): Headers {
   const h = new Headers();
@@ -349,9 +390,13 @@ Deno.serve(async (req: Request) => {
       if (DATE_RE.test(dDate)) { if (!db.plans[dDate]) { planFor(db, dDate); changed = true; } }
       syncWishes(db);
       if (changed) await saveDb(db);
-      const plans = DATE_RE.test(dDate) ? { today: db.plans[dDate], tomorrow: db.plans[addDays(dDate, 1)] || { date: addDays(dDate, 1), replies: {}, cook: null } } : {};
+      const dayPlan = (n: number): Plan => db.plans[addDays(dDate, n)] || { date: addDays(dDate, n), replies: {}, cook: null };
+      // today / tomorrow 留给还没刷新的旧网页；新网页用 days（今晚、明晚、后天）
+      const plans = DATE_RE.test(dDate) ? { today: db.plans[dDate], tomorrow: dayPlan(1), days: [db.plans[dDate], dayPlan(1), dayPlan(2)] } : {};
+      // 常买：买得多的在前，记录不够时用家里常备的补齐
       const frequent = Object.entries(db.shopHistory).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([n]) => n);
-      return json({ dishes: db.dishes, pick: db.pick, pickDate: db.pickDate, targetDate: targetDate(), wishes: db.wishes, plans, shopping: db.shopping, frequent, voice: !!DASHSCOPE_API_KEY, ai: !!DASHSCOPE_API_KEY, autoPickHour: AUTO_PICK_HOUR });
+      for (const n of STAPLES) { if (frequent.length >= 12) break; if (!frequent.includes(n)) frequent.push(n); }
+      return json({ dishes: db.dishes, pick: db.pick, pickDate: db.pickDate, targetDate: targetDate(), wishes: db.wishes, plans, shopping: db.shopping, frequent, profiles: db.profiles, voice: !!DASHSCOPE_API_KEY, ai: !!DASHSCOPE_API_KEY, autoPickHour: AUTO_PICK_HOUR });
     }
 
     if (m === "POST" && path === "/api/pick") {
@@ -463,18 +508,67 @@ Deno.serve(async (req: Request) => {
       else if (typeof body.name === "string" && body.name.trim()) dish = ensureDish(db, String(body.name).slice(0, 30), "dinner", who);
       if (!dish) return bad("找不到这道菜");
       const dup = db.wishes.find((w) => w.dishId === dish!.id && w.who === who && w.status !== "done");
-      if (!dup) db.wishes.push({ id: Date.now(), dishId: dish.id, who, at: nowIso(), status: "open" });
+      const hb = body.hb !== undefined ? cleanHb(body.hb) : undefined;
+      if (dup) { if (hb !== undefined) dup.hb = hb || undefined; }
+      else db.wishes.push({ id: Date.now(), dishId: dish.id, who, at: nowIso(), status: "open", hb: hb || undefined });
       syncWishes(db);
       await saveDb(db);
       return json({ wishes: db.wishes, dish });
     }
-    const wishRoute = path.match(/^\/api\/wishes\/(\d+)\/remove$/);
+    const wishRoute = path.match(/^\/api\/wishes\/(\d+)\/(remove|update)$/);
     if (wishRoute && m === "POST") {
       const id = Number(wishRoute[1]);
       const { db } = await loadDb();
-      db.wishes = db.wishes.filter((w) => w.id !== id);
+      if (wishRoute[2] === "remove") db.wishes = db.wishes.filter((w) => w.id !== id);
+      else {
+        const body = await req.json().catch(() => ({}));
+        const w = db.wishes.find((x) => x.id === id);
+        if (!w) return bad("找不到这个心愿", 404);
+        if (body.hb !== undefined) w.hb = cleanHb(body.hb) || undefined;
+        if (typeof body.hbPaid === "boolean") w.hbPaid = body.hbPaid || undefined;
+      }
       await saveDb(db);
       return json({ wishes: db.wishes });
+    }
+
+    const profRoute = path.match(/^\/api\/profile\/(\w+)\/photo$/);
+    if (profRoute && m === "POST") {
+      const who = profRoute[1];
+      if (!PEOPLE.includes(who)) return bad("不认识这个人");
+      const ct = (req.headers.get("content-type") || "").split(";")[0].trim();
+      if (!/^image\/(jpeg|png|webp)$/.test(ct)) return bad("只能传 jpg / png / webp 图片");
+      const bytes = new Uint8Array(await req.arrayBuffer());
+      if (!bytes.length) return bad("图片是空的");
+      if (bytes.length > 3 * 1024 * 1024) return bad("照片太大了，超过 3MB");
+      const key = `avatar-${who}.jpg`;
+      const { error } = await supabase.storage.from(BUCKET).upload(key, bytes, { contentType: ct, upsert: true, cacheControl: "31536000" });
+      if (error) throw error;
+      const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(key);
+      const { db } = await loadDb();
+      db.profiles[who] = { ...(db.profiles[who] || {}), avatar: `${pub.publicUrl}?v=${Date.now()}` };
+      await saveDb(db);
+      return json({ profiles: db.profiles });
+    }
+
+    if (m === "POST" && path === "/api/feedback") {
+      const body = await req.json().catch(() => ({}));
+      const who = PEOPLE.includes(String(body.who)) ? String(body.who) : "";
+      const text = String(body.text || "").trim().slice(0, 500);
+      if (!text) return bad("还没写内容");
+      const { db } = await loadDb();
+      db.feedback.push({ id: Date.now(), who, text, at: nowIso() });
+      if (db.feedback.length > 100) db.feedback = db.feedback.slice(-100);
+      await saveDb(db);
+      return json({ ok: true });
+    }
+
+    if (m === "POST" && path === "/api/suggest") {
+      if (!DASHSCOPE_API_KEY) return bad("还没配置 AI", 501);
+      const body = await req.json().catch(() => ({}));
+      const cat: Cat = body.cat === "breakfast" ? "breakfast" : "dinner";
+      const { db } = await loadDb();
+      try { return json({ items: await qwenSuggest(cat, db.dishes.map((d) => d.name)) }); }
+      catch { return bad("AI 服务出错了，请再试一次", 502); }
     }
 
     if (m === "POST" && path === "/api/dinner/reply") {
