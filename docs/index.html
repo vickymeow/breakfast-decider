@@ -176,8 +176,12 @@ button.dlink .go{font-size:.75em;color:var(--accent-deep);margin-left:2px;text-d
 .menu-tip{font-size:18px;color:var(--muted);background:var(--paper);border:2px dashed var(--line);border-radius:14px;padding:10px 12px;margin:4px 0 6px;line-height:1.5}
 .menu-tip b{color:var(--fg)}
 /* 菜谱本：「我想做」→ 选哪天 */
-.menu-list .want{display:inline-block;margin-top:8px;font-size:20px;font-weight:800;padding:8px 14px;border-radius:999px;border:3px solid var(--accent-deep);background:var(--accent);color:var(--fg)}
-.menu-list .ptag{display:inline-block;margin:8px 0 0 6px;font-size:17px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--good-soft);color:#1b5e20;border:2px solid #2e7d32;vertical-align:middle}
+.menu-list .quick{display:flex;gap:8px;margin-top:10px}
+.menu-list .quick button{flex:1;min-width:0;font-size:21px;font-weight:800;padding:12px 6px;border-radius:16px;border:3px solid var(--accent-deep);background:var(--accent);color:var(--fg);white-space:nowrap}
+.menu-list .quick button.buy{border-color:#2e7d32;background:var(--good-soft);color:#1b5e20}
+.menu-list .quick button.buy.all{background:var(--paper);color:var(--muted);border-color:var(--line)}
+.menu-list .ptags{margin-top:2px}
+.menu-list .ptag{display:inline-block;margin:8px 6px 0 0;font-size:17px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--good-soft);color:#1b5e20;border:2px solid #2e7d32;vertical-align:middle}
 .daypick button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:14px 16px;margin-bottom:8px;border-radius:18px;border:3px solid var(--line);background:var(--paper);font-size:24px}
 .daypick button b{font-size:25px}
 .daypick button small{font-size:18px;color:var(--muted);font-weight:400}
@@ -352,7 +356,7 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
   <button type="button" id="btnMenuSuggest" class="big-btn ghost" style="width:100%" hidden>✨ 推荐几道新菜</button>
   <p id="menuSuggestStatus" class="note"></p>
   <div id="menuSuggest"></div>
-  <p class="menu-tip"><b>🍳 我想做</b> = 点一下、选哪天晚上，这道菜就排进那天，小饭桌上能看到。<br><b>⭐ 拿手菜</b> = 妈妈最会做的菜：点菜页排在前面，妈妈定晚饭时单独列一栏。在菜的「详情」里设置。<br><b>☰ 按住上下拖</b>，排菜的顺序；有 🧧 红包的菜自动排最前。</p>
+  <p class="menu-tip"><b>🍳 我想做</b> = 点一下、选哪天晚上，这道菜就排进那天，小饭桌上能看到。<br><b>🛒 我要买</b> = 这道菜还缺的食材一下加进菜篮子。<br><b>⭐ 拿手菜</b> = 妈妈最会做的菜：点菜页排在前面，妈妈定晚饭时单独列一栏。在菜的「详情」里设置。<br><b>☰ 按住上下拖</b>，排菜的顺序；有 🧧 红包的菜自动排最前。</p>
   <button type="button" class="secfold" id="foldDinner"></button>
   <ul id="listDinner" class="menu-list"></ul>
   <button type="button" class="secfold" id="foldBreakfast"></button>
@@ -1054,9 +1058,9 @@ function dishRow(d, i, n){
   var hb=hbTotal(d.id);
   var meta=(d.ingredients&&d.ingredients.length?'食材 '+d.ingredients.length+' 样':'还没填食材')+(d.cat==='dinner'?(d.lastMade?' · 上次 '+d.lastMade.slice(5).replace('-','/'):' · 没做过')+(d.times?' · 做过 '+d.times+' 次':''):'');
   var html='<li data-id="'+d.id+'"><div class="top"><span class="drag" data-drag="1" role="button" aria-label="按住上下拖，排顺序">☰</span><div class="thumb">'+esc(d.emoji||'🍽️')+(d.image?'<img src="'+esc(d.image)+'" alt="" onload="this.className=\'ok\'" onerror="this.remove()">':'')+'</div>'
-    +'<span class="mname">'+(d.mom&&d.cat==='dinner'?'⭐ ':'')+esc(d.name)+(hb?' '+hbHtml(hb,hbMsgOf(d.id)):'')+'<small>'+esc(meta)+'</small>'
-    +(d.cat==='dinner'?'<button type="button" class="want" data-act="want">🍳 我想做</button>'+plannedTags(d.id):'')+'</span>'
-    +'<button type="button" class="open" data-act="toggle">'+(open?'收起':'详情')+'</button></div>';
+    +'<span class="mname">'+(d.mom&&d.cat==='dinner'?'⭐ ':'')+esc(d.name)+(hb?' '+hbHtml(hb,hbMsgOf(d.id)):'')+'<small>'+esc(meta)+'</small></span>'
+    +'<button type="button" class="open" data-act="toggle">'+(open?'收起':'详情')+'</button></div>'
+    +quickRow(d);
   if(open){
     var ing=(d.ingredients||[]);
     var missing=ing.filter(function(x){ return !openItem(x); });
@@ -1134,6 +1138,33 @@ function endDrag(e){
 }
 ['dinner','breakfast'].forEach(function(k){ $(k==='dinner'?'foldDinner':'foldBreakfast').onclick=function(){ menuFold[k]=!menuFold[k]; store('bf_fold_'+k, menuFold[k]?'1':null); renderRecipes(); }; });
 function saveIngredients(d, items){ return act(api('/api/dishes/'+d.id+'/update',{method:'POST',json:{ingredients:items}}),'食材记住了'); }
+// 菜名下面一整行：🍳 我想做（排哪天，只有正餐）、🛒 我要买（缺的食材进菜篮子）
+function quickRow(d){
+  var ing=d.ingredients||[], miss=ing.filter(function(x){ return !openItem(x); });
+  var allIn=ing.length&&!miss.length;
+  var buy='<button type="button" class="buy'+(allIn?' all':'')+'" data-act="wantbuy">'+(allIn?'✓ 都在菜篮子':'🛒 我要买'+(ing.length&&miss.length<ing.length?' '+miss.length+' 样':''))+'</button>';
+  var tags=d.cat==='dinner'?plannedTags(d.id):'';
+  return '<div class="quick">'+(d.cat==='dinner'?'<button type="button" data-act="want">🍳 我想做</button>':'')+buy+'</div>'+(tags?'<div class="ptags">'+tags+'</div>':'');
+}
+// 「我要买」：缺的食材一下加进菜篮子；没填食材的，有 AI 就先让 AI 填再加，没有就展开让人说一句；都在了就去菜篮子
+var buyBusy=false;
+function wantBuy(d){
+  var ing=d.ingredients||[], miss=ing.filter(function(x){ return !openItem(x); });
+  if(ing.length&&!miss.length){ showView('shop'); window.scrollTo(0,0); toast('「'+d.name+'」要的都在菜篮子里了'); return; }
+  if(ing.length){ act(api('/api/shopping',{method:'POST',json:{op:'add',names:miss,from:d.name}}), '加进菜篮子了：'+miss.join('、')); return; }
+  if(!state.ai){ expandedId=d.id; pendingDelete=null; renderRecipes(); toast('「'+d.name+'」还没填食材，说一句要买什么，填好再点「我要买」', 4000); return; }
+  if(buyBusy) return; buyBusy=true;
+  toast('「'+d.name+'」还没填食材，AI 正在想要买什么…', 6000);
+  api('/api/ingredients',{method:'POST',json:{name:d.name}}).then(function(r){
+    var items=(r.items||[]).filter(Boolean);
+    if(!items.length) throw new Error('AI 没想出来，点「详情」自己说一句吧');
+    return api('/api/dishes/'+d.id+'/update',{method:'POST',json:{ingredients:items}}).then(function(){
+      var need=items.filter(function(x){ return !openItem(x); });
+      return need.length?api('/api/shopping',{method:'POST',json:{op:'add',names:need,from:d.name}}).then(function(){ return need; }):[];
+    });
+  }).then(function(need){ buyBusy=false; toast(need.length?'食材填好了，加进菜篮子：'+need.join('、'):'食材填好了，都在菜篮子里', 4000); return loadState(); })
+    .catch(function(e){ buyBusy=false; toast(e.message||'没成功，请再试一次'); });
+}
 // 这道菜已经排在哪几天（没做的）
 function plannedTags(id){ return planDays().filter(function(p){ return !p.done&&p.cook&&(p.cook.dishIds||[]).indexOf(id)>=0; }).map(function(p){ return '<span class="ptag">📅 '+esc(nightLabel(p.date))+'</span>'; }).join(''); }
 // 「我想做」：弹出最近一周，点一天就把这道菜加进那天的晚饭（原来定的菜留着）
@@ -1173,6 +1204,7 @@ function openWant(d){
 function recipeAction(a, d, el, li){
   var ing=(d.ingredients||[]).slice();
   if(a==='want'){ openWant(d); return; }
+  if(a==='wantbuy'){ wantBuy(d); return; }
   if(a==='toggle'){ expandedId=expandedId===d.id?null:d.id; pendingDelete=null; renderRecipes(); return; }
   if(a==='rming'){ var x=el.getAttribute('data-x'); saveIngredients(d, ing.filter(function(y){ return y!==x; })); return; }
   if(a==='buy'){ var bx=el.getAttribute('data-x'), it=openItem(bx); if(it) act(api('/api/shopping',{method:'POST',json:{op:'remove',id:it.id}}),'从要买里拿掉了'); else shopAdd([bx], d.name); return; }
