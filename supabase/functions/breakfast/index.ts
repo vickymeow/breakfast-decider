@@ -204,6 +204,7 @@ async function qwenTranscribe(bytes: Uint8Array, contentType: string): Promise<s
   const models = workingAsrModel ? [workingAsrModel, ...ASR_CANDIDATES.filter((m) => m !== workingAsrModel)] : ASR_CANDIDATES;
   let lastErr = "";
   for (const model of models) {
+    if (workingAsrVariant === 99) break; // 上次是转写接口通的，跳过对话式
     const variants = asrBodies(model, b64, contentType, fmt);
     const order = workingAsrVariant >= 0 ? [workingAsrVariant, ...variants.map((_, i) => i).filter((i) => i !== workingAsrVariant)] : variants.map((_, i) => i);
     let modelMissing = false;
@@ -223,6 +224,23 @@ async function qwenTranscribe(bytes: Uint8Array, contentType: string): Promise<s
       if (r.status === 404 && txt.includes("model_not_found")) { modelMissing = true; break; }
     }
     if (modelMissing) continue;
+  }
+  // 对话式都不行：再试 OpenAI 风格的录音转写接口（上传文件）
+  for (const model of models) {
+    const form = new FormData();
+    form.append("file", new Blob([bytes], { type: contentType }), `voice.${fmt === "mp4" ? "m4a" : fmt}`);
+    form.append("model", model);
+    form.append("language", "zh");
+    const r = await fetch(`${ASR_BASE_URL}/audio/transcriptions`, { method: "POST", headers: { authorization: `Bearer ${ASR_API_KEY}` }, body: form });
+    const txt = await r.text();
+    if (r.ok) {
+      workingAsrModel = model; workingAsrVariant = 99;
+      console.log("qwen asr ok (transcriptions)", model, contentType, bytes.length);
+      try { const j = JSON.parse(txt); return String(j.text || j.result?.text || "").trim(); } catch { return txt.trim(); }
+    }
+    lastErr = `${model} transcriptions ${contentType} ${bytes.length}B: ${r.status} ${txt.slice(0, 300)}`;
+    console.error("qwen asr failed", lastErr);
+    if (r.status === 401 || r.status === 403) break;
   }
   throw new Error("asr: " + lastErr);
 }
