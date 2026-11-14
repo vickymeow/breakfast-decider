@@ -182,30 +182,47 @@ function toB64(bytes: Uint8Array): string {
   for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode(...bytes.subarray(i, i + CH));
   return btoa(bin);
 }
+// 几种请求写法：文档打不开，哪种被接受就记住哪种（按模型 + 写法）
+let workingAsrVariant = -1;
+function asrBodies(model: string, b64: string, contentType: string, fmt: string): { name: string; body: unknown }[] {
+  const dataUrl = `data:${contentType};base64,${b64}`;
+  const alt = fmt === "mp4" ? "m4a" : fmt === "webm" ? "opus" : fmt;
+  const u = (part: unknown) => [{ role: "user", content: [part] }];
+  return [
+    { name: "plain", body: { model, stream: false, messages: u({ type: "input_audio", input_audio: { data: dataUrl, format: fmt } }) } },
+    { name: "sys+opts", body: { model, stream: false, messages: [{ role: "system", content: [{ type: "text", text: "家里做饭的对话，内容是菜名和食材。" }] }, ...u({ type: "input_audio", input_audio: { data: dataUrl, format: fmt } })], asr_options: { enable_itn: false, language: "zh" } } },
+    { name: "alt-format", body: { model, stream: false, messages: u({ type: "input_audio", input_audio: { data: dataUrl, format: alt } }) } },
+    { name: "no-format", body: { model, stream: false, messages: u({ type: "input_audio", input_audio: { data: dataUrl } }) } },
+    { name: "raw-b64", body: { model, stream: false, messages: u({ type: "input_audio", input_audio: { data: b64, format: fmt } }) } },
+    { name: "audio_url", body: { model, stream: false, messages: u({ type: "audio_url", audio_url: { url: dataUrl } }) } },
+    { name: "plain+text", body: { model, stream: false, messages: [{ role: "user", content: [{ type: "input_audio", input_audio: { data: dataUrl, format: fmt } }, { type: "text", text: "请把这段话转成文字。" }] }] } },
+  ];
+}
 async function qwenTranscribe(bytes: Uint8Array, contentType: string): Promise<string> {
   const fmt = contentType.includes("webm") ? "webm" : contentType.includes("ogg") ? "ogg" : contentType.includes("wav") ? "wav" : contentType.includes("mpeg") ? "mp3" : contentType.includes("aac") ? "aac" : "mp4";
-  const audio = `data:${contentType};base64,${toB64(bytes)}`;
-  const order = workingAsrModel ? [workingAsrModel, ...ASR_CANDIDATES.filter((m) => m !== workingAsrModel)] : ASR_CANDIDATES;
+  const b64 = toB64(bytes);
+  const models = workingAsrModel ? [workingAsrModel, ...ASR_CANDIDATES.filter((m) => m !== workingAsrModel)] : ASR_CANDIDATES;
   let lastErr = "";
-  for (const model of order) {
-    const body = {
-      model, stream: false,
-      messages: [
-        { role: "system", content: [{ type: "text", text: "家里做饭的对话，内容是菜名和食材。" }] },
-        { role: "user", content: [{ type: "input_audio", input_audio: { data: audio, format: fmt } }] },
-      ],
-      asr_options: { enable_itn: false, language: "zh" },
-    };
-    const r = await fetch(`${ASR_BASE_URL}/chat/completions`, { method: "POST", headers: { authorization: `Bearer ${ASR_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify(body) });
-    const txt = await r.text();
-    if (r.ok) {
-      workingAsrModel = model;
-      const c = JSON.parse(txt)?.choices?.[0]?.message?.content;
-      return (Array.isArray(c) ? c.map((x: { text?: string }) => x.text || "").join("") : String(c || "")).trim();
+  for (const model of models) {
+    const variants = asrBodies(model, b64, contentType, fmt);
+    const order = workingAsrVariant >= 0 ? [workingAsrVariant, ...variants.map((_, i) => i).filter((i) => i !== workingAsrVariant)] : variants.map((_, i) => i);
+    let modelMissing = false;
+    for (const vi of order) {
+      const v = variants[vi];
+      const r = await fetch(`${ASR_BASE_URL}/chat/completions`, { method: "POST", headers: { authorization: `Bearer ${ASR_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify(v.body) });
+      const txt = await r.text();
+      if (r.ok) {
+        workingAsrModel = model; workingAsrVariant = vi;
+        console.log("qwen asr ok", model, v.name, contentType, bytes.length);
+        const c = JSON.parse(txt)?.choices?.[0]?.message?.content;
+        return (Array.isArray(c) ? c.map((x: { text?: string }) => x.text || "").join("") : String(c || "")).trim();
+      }
+      lastErr = `${model} ${v.name} ${contentType} ${bytes.length}B: ${r.status} ${txt.slice(0, 300)}`;
+      console.error("qwen asr failed", lastErr);
+      if (r.status === 401 || r.status === 403) throw new Error("asr: " + lastErr);
+      if (r.status === 404 && txt.includes("model_not_found")) { modelMissing = true; break; }
     }
-    lastErr = `${model}: ${r.status} ${txt.slice(0, 300)}`;
-    console.error("qwen asr failed", lastErr);
-    if (r.status === 401 || r.status === 403) break;
+    if (modelMissing) continue;
   }
   throw new Error("asr: " + lastErr);
 }
