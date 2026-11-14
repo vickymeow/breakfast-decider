@@ -563,7 +563,6 @@ function dishRow(d, i, n){
       +'<div class="acts">'+(state.ai?'<button type="button" data-act="ai">✨ AI 帮我填食材</button>':'')
       +'<label>📷 照片<input type="file" accept="image/*" data-act="photo"></label>'
       +(d.cat==='dinner'?'<button type="button" data-act="mom">'+(d.mom?'⭐ 拿手菜':'☆ 设为拿手菜')+'</button>':'')
-      +'<button type="button" data-act="cat">'+(d.cat==='dinner'?'移到早饭':'移到正餐')+'</button>'
       +'<button type="button" data-act="up" '+(i===0?'disabled':'')+'>↑</button><button type="button" data-act="down" '+(i===n-1?'disabled':'')+'>↓</button>'
       +'<button type="button" class="del'+(pendingDelete===d.id?' confirm':'')+'" data-act="del">'+(pendingDelete===d.id?'确定删除？':'删除')+'</button></div></div>';
   }
@@ -593,7 +592,6 @@ function recipeAction(a, d, el, li){
   if(a==='ingvoice'){ voiceCapture({btn:el,status:li.querySelector('#ingStatus'),input:li.querySelector('#ingInput'),onText:function(t){ var add=parseList(t); if(!add.length){ li.querySelector('#ingStatus').textContent='没听出食材，再说一次'; return; } saveIngredients(d, ing.concat(add.filter(function(y){ return ing.indexOf(y)<0; }))); }}); return; }
   if(a==='ai'){ li.querySelector('#ingStatus').textContent='AI 正在想…'; api('/api/ingredients',{method:'POST',json:{name:d.name}}).then(function(r){ var items=(r.items||[]).filter(function(y){ return ing.indexOf(y)<0; }); if(!items.length){ li.querySelector('#ingStatus').textContent='AI 没给出新的食材'; return; } return saveIngredients(d, ing.concat(items)); }).catch(function(e){ li.querySelector('#ingStatus').textContent=e.message||'AI 出错了'; }); return; }
   if(a==='mom'){ act(api('/api/dishes/'+d.id+'/update',{method:'POST',json:{mom:!d.mom}}), d.mom?'取消拿手菜':'设为拿手菜了'); return; }
-  if(a==='cat'){ act(api('/api/dishes/'+d.id+'/update',{method:'POST',json:{cat:d.cat==='dinner'?'breakfast':'dinner'}}),'移好了'); return; }
   if(a==='up'||a==='down'){ act(api('/api/dishes/'+d.id+'/move',{method:'POST',json:{direction:a}})); return; }
   if(a==='del'){ if(pendingDelete!==d.id){ pendingDelete=d.id; renderRecipes(); setTimeout(function(){ if(pendingDelete===d.id){ pendingDelete=null; renderRecipes(); } },4000); return; } pendingDelete=null; expandedId=null; act(api('/api/dishes/'+d.id,{method:'DELETE'}),'删掉了'); return; }
 }
