@@ -129,7 +129,7 @@ body.mom .menu-list .mname,body.mom .card .name{font-size:30px}
   <p>选一次就记住了，以后不再问</p>
   <button type="button" class="mom" data-role="mom">👩 我是妈妈</button>
   <button type="button" data-role="kid">👧 我是女儿</button>
-  <button type="button" data-role="jim">👨 我是 Jim</button>
+  <button type="button" data-role="jim">👨 我是小陈</button>
 </section>
 
 <div id="app" hidden>
@@ -183,7 +183,7 @@ var EMOJI_RULES = [['三明治','🥪'],['汉堡','🍔'],['吐司','🍞'],['�
 function emojiFor(name){ for (var i=0;i<EMOJI_RULES.length;i++){ if (name.indexOf(EMOJI_RULES[i][0])>=0) return EMOJI_RULES[i][1]; } return '🍽️'; }
 
 var state = { dishes: [], pick: null, pickDate: null, dinner: null };
-var PEOPLE = { mom:{name:'妈妈',emoji:'👩'}, kid:{name:'女儿',emoji:'👧'}, jim:{name:'Jim',emoji:'👨'} };
+var PEOPLE = { mom:{name:'妈妈',emoji:'👩'}, kid:{name:'女儿',emoji:'👧'}, jim:{name:'小陈',emoji:'👨'} };
 var MEMBERS = ['kid','jim'];           // 会对晚饭表态的人
 var DINNER_DEFAULT_HOUR = 17;          // 下午 5 点还没说，算回来吃
 var DINNER_ROLL_HOUR = 20;             // 晚上 8 点后，晚饭页说的是明天
@@ -297,7 +297,7 @@ function renderDinner(){
   $('dinnerHint').textContent=(isToday?'今晚':'明晚')+'的晚饭 · '+dateLabel(dd).replace(/^今天 |^明天 /,'')+(role==='mom'?'':'，告诉妈妈回不回来吃、想吃什么');
   var mine=$('dinnerMine'), board=$('dinnerBoard'), cook=$('dinnerCook');
   var wishes=(dn&&dn.wishes)||[];
-  // 我的表态（女儿 / Jim）
+  // 我的表态（女儿 / 小陈）
   if(MEMBERS.indexOf(role)>=0){
     mine.hidden=false;
     var r=dn&&dn.replies?dn.replies[role]:null, home=r?r.home:null, wish=r?r.wish:'';
