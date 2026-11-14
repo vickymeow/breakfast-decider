@@ -13,6 +13,7 @@
 //   POST /api/wishes/:id/remove
 //   POST /api/dinner/reply {who, home, date}          回不回来吃
 //   POST /api/dinner/cook  {date, dishIds, text}      妈妈定今晚/明晚做什么（空 = 取消）
+//   POST /api/shopping    {op:"add", names:[], from?} | {op:"toggle"|"remove", id} | {op:"clear_done"}   买菜清单（全家共用）
 //   POST /api/transcribe  （请求体是录音）           Qwen 语音转文字
 //   POST /api/ingredients {name}                      Qwen 给出食材清单
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -44,7 +45,8 @@ type Pick = { type: "dish" | "random" | "skip"; dish: number | null; dishes?: nu
 type Reply = { home: boolean | null; at: string };
 type Plan = { date: string; replies: Record<string, Reply>; cook: { dishIds: number[]; text: string; at: string } | null; done?: boolean };
 type Wish = { id: number; dishId: number; who: string; at: string; status: "open" | "planned" | "done"; plannedFor?: string; doneAt?: string };
-type Db = { v: number; dishes: Dish[]; pick: Pick | null; pickDate: string | null; plans: Record<string, Plan>; wishes: Wish[] };
+type ShopItem = { id: number; name: string; done: boolean; from?: string; at: string; doneAt?: string };
+type Db = { v: number; dishes: Dish[]; pick: Pick | null; pickDate: string | null; plans: Record<string, Plan>; wishes: Wish[]; shopping: ShopItem[]; shopHistory: Record<string, number> };
 const MEMBERS = ["kid", "jim"];
 
 const SEED_NAMES: [string, string][] = [["乌冬面","🍜"],["炒荞麦面","🍝"],["馄饨","🥟"],["蒸饺","🥟"],["煎饺","🥟"],["炒饭","🍚"],["吐司","🍞"],["鸡蛋","🥚"]];
@@ -61,12 +63,17 @@ const addDays = (date: string, n: number) => { const d = new Date(date + "T00:00
 
 // ---- 数据读写与迁移 ----
 function fresh(): Db {
-  return { v: 2, dishes: SEED_NAMES.map(([name, emoji], i) => ({ id: i + 1, name, emoji, cat: "breakfast", mom: true, ingredients: [], lastMade: null, times: 0 })), pick: null, pickDate: null, plans: {}, wishes: [] };
+  return { v: 2, dishes: SEED_NAMES.map(([name, emoji], i) => ({ id: i + 1, name, emoji, cat: "breakfast", mom: true, ingredients: [], lastMade: null, times: 0 })), pick: null, pickDate: null, plans: {}, wishes: [], shopping: [], shopHistory: {} };
 }
 // 旧结构（v1：dishes 只有早饭；dinner 一份含 wish 文本）升到 v2
 // deno-lint-ignore no-explicit-any
 function migrate(raw: any): { db: Db; changed: boolean } {
-  if (raw && raw.v === 2) return { db: raw as Db, changed: false };
+  if (raw && raw.v === 2) {
+    const db = raw as Db; let changed = false;
+    if (!Array.isArray(db.shopping)) { db.shopping = []; changed = true; }
+    if (!db.shopHistory || typeof db.shopHistory !== "object") { db.shopHistory = {}; changed = true; }
+    return { db, changed };
+  }
   const db: Db = fresh();
   if (raw && Array.isArray(raw.dishes) && raw.dishes.length) {
     // deno-lint-ignore no-explicit-any
@@ -132,6 +139,11 @@ function settle(db: Db, today: string): boolean {
   const before = db.wishes.length;
   db.wishes = db.wishes.filter((w) => !(w.status === "done" && w.doneAt && w.doneAt < addDays(today, -14)));
   if (db.wishes.length !== before) changed = true;
+  // 买到的东西两天后自动从清单消失
+  const cutoff = new Date(Date.now() - 2 * 86400000).toISOString();
+  const sb = db.shopping.length;
+  db.shopping = db.shopping.filter((it) => !(it.done && it.doneAt && it.doneAt < cutoff));
+  if (db.shopping.length !== sb) changed = true;
   return changed;
 }
 function autoPickIfDue(db: Db, date: string, hour: number): boolean {
@@ -239,7 +251,8 @@ Deno.serve(async (req: Request) => {
       syncWishes(db);
       if (changed) await saveDb(db);
       const plans = DATE_RE.test(dDate) ? { today: db.plans[dDate], tomorrow: db.plans[addDays(dDate, 1)] || { date: addDays(dDate, 1), replies: {}, cook: null } } : {};
-      return json({ dishes: db.dishes, pick: db.pick, pickDate: db.pickDate, targetDate: targetDate(), wishes: db.wishes, plans, voice: !!DASHSCOPE_API_KEY, ai: !!DASHSCOPE_API_KEY, autoPickHour: AUTO_PICK_HOUR });
+      const frequent = Object.entries(db.shopHistory).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([n]) => n);
+      return json({ dishes: db.dishes, pick: db.pick, pickDate: db.pickDate, targetDate: targetDate(), wishes: db.wishes, plans, shopping: db.shopping, frequent, voice: !!DASHSCOPE_API_KEY, ai: !!DASHSCOPE_API_KEY, autoPickHour: AUTO_PICK_HOUR });
     }
 
     if (m === "POST" && path === "/api/pick") {
@@ -390,6 +403,36 @@ Deno.serve(async (req: Request) => {
       syncWishes(db);
       await saveDb(db);
       return json({ plan, wishes: db.wishes });
+    }
+
+    if (m === "POST" && path === "/api/shopping") {
+      const body = await req.json().catch(() => ({}));
+      const op = String(body.op || "");
+      const { db } = await loadDb();
+      if (op === "add") {
+        const names = cleanList(body.names);
+        if (!names.length) return bad("没有要加的东西");
+        const from = typeof body.from === "string" ? body.from.slice(0, 30) : "";
+        for (const n of names) {
+          const open = db.shopping.find((it) => it.name === n && !it.done);
+          if (open) continue;
+          if (db.shopping.length >= 150) return bad("清单太长了，先清一下已买的");
+          db.shopping.push({ id: Date.now() + Math.floor(Math.random() * 1000), name: n, done: false, from: from || undefined, at: nowIso() });
+          db.shopHistory[n] = (db.shopHistory[n] || 0) + 1;
+        }
+        const keys = Object.keys(db.shopHistory);
+        if (keys.length > 60) for (const k of keys.sort((a, b) => db.shopHistory[a] - db.shopHistory[b]).slice(0, keys.length - 60)) delete db.shopHistory[k];
+      } else if (op === "toggle" || op === "remove") {
+        const id = Number(body.id);
+        const it = db.shopping.find((x) => x.id === id);
+        if (!it) return bad("清单里没有这一项", 404);
+        if (op === "remove") db.shopping = db.shopping.filter((x) => x.id !== id);
+        else { it.done = !it.done; it.doneAt = it.done ? nowIso() : undefined; }
+      } else if (op === "clear_done") {
+        db.shopping = db.shopping.filter((x) => !x.done);
+      } else return bad("不认识的操作");
+      await saveDb(db);
+      return json({ shopping: db.shopping });
     }
 
     if (m === "POST" && path === "/api/transcribe") {

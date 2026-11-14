@@ -129,6 +129,18 @@ h3.sec{font-size:22px;color:var(--muted);margin:18px 0 8px}
 .detail .acts .del.confirm{background:var(--bad);border-color:var(--bad);color:#fff}
 .detail .acts input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .detail .ing{margin:6px 0 10px}
+/* 买菜 */
+.plan-dish{border-top:2px solid var(--line);padding:10px 0}
+.plan-dish:first-of-type{border-top:none;padding-top:0}
+.plan-dish .t{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:24px;font-weight:800}
+.plan-dish .t button{margin-left:auto;font-size:19px;padding:8px 12px;border-radius:12px;border:2px solid var(--accent-deep);background:var(--paper);flex-shrink:0}
+.shop-item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--paper);border:3px solid var(--line);border-radius:18px;padding:12px 14px;margin-bottom:8px;font-size:26px;font-weight:700}
+.shop-item .bx{width:38px;height:38px;border-radius:50%;border:3px solid var(--accent-deep);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:24px;background:var(--bg)}
+.shop-item .nm{flex:1;min-width:0;overflow-wrap:anywhere}
+.shop-item .nm small{display:block;font-size:16px;color:var(--muted);font-weight:400}
+.shop-item.done{opacity:.55}
+.shop-item.done .nm{text-decoration:line-through}
+.shop-item.done .bx{background:var(--good-soft);border-color:#2e7d32}
 .empty{background:var(--paper);border:3px dashed var(--line);border-radius:22px;padding:24px 16px;text-align:center;font-size:21px;color:var(--muted);grid-column:1/-1}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#1f1b17;color:#fff;padding:14px 22px;border-radius:16px;font-size:22px;z-index:20;max-width:90vw;text-align:center}
 .foot{text-align:center;margin-top:28px;font-size:18px;color:var(--muted)}
@@ -201,6 +213,22 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
   <p id="pickStatus" class="status"></p>
 </section>
 
+<!-- 买菜（全家） -->
+<section id="view-shop" class="view">
+  <h2 class="sec" style="margin-top:6px">这两天要做的菜 <small>点食材就进清单</small></h2>
+  <div id="planBox" class="box"></div>
+  <h2 class="sec">要买的东西 <small id="shopCount"></small></h2>
+  <form class="add-row" id="shopForm">
+    <input id="shopInput" placeholder="说一句或打字，比如：牛奶 鸡蛋" autocomplete="off">
+    <button type="button" id="btnShopVoice" class="mic">🎤</button>
+    <button type="submit" class="big-btn">加</button>
+  </form>
+  <p id="shopStatus" class="note"></p>
+  <div class="chips" id="frequentChips" style="margin-bottom:12px"></div>
+  <div id="shopList"></div>
+  <button type="button" id="btnClearDone" class="big-btn ghost" style="width:100%" hidden>清空已买的</button>
+</section>
+
 <!-- 菜谱（全家） -->
 <section id="view-recipes" class="view">
   <p class="hint">说一道菜的名字就能加进去；食材也可以说</p>
@@ -233,11 +261,11 @@ var FALLBACK_NAME = '鸡蛋三明治', FALLBACK_EMOJI = '🥪';
 var PEOPLE = { mom:{name:'妈妈',emoji:'👩'}, kid:{name:'女儿',emoji:'👧'}, jim:{name:'小陈',emoji:'👨'} };
 var MEMBERS = ['kid','jim'];
 var DINNER_DEFAULT_HOUR = 17, DINNER_ROLL_HOUR = 20;
-var NAV = { mom:['today','recipes'], kid:['order','breakfast','recipes'], jim:['order','breakfast','recipes'] };
-var VIEW_NAMES = { today:'今天', order:'点菜', breakfast:'早饭', recipes:'菜谱' };
-var VIEWS = ['today','order','breakfast','recipes'];
+var NAV = { mom:['today','shop','recipes'], kid:['order','breakfast','shop','recipes'], jim:['order','breakfast','shop','recipes'] };
+var VIEW_NAMES = { today:'今天', order:'点菜', breakfast:'早饭', shop:'买菜', recipes:'菜谱' };
+var VIEWS = ['today','order','breakfast','shop','recipes'];
 
-var state = { dishes:[], pick:null, pickDate:null, wishes:[], plans:{}, voice:false, ai:false, autoPickHour:6 };
+var state = { dishes:[], pick:null, pickDate:null, wishes:[], plans:{}, shopping:[], frequent:[], voice:false, ai:false, autoPickHour:6 };
 var loaded=false, role=null, lastOk=0;
 var pendingDelete=null, expandedId=null, chooser=null, newCat='dinner';
 
@@ -342,7 +370,7 @@ function speak(text, noteEl){
 // ---- 渲染：总入口 ----
 function render(){
   $('dateLine').textContent=dateLabel(today()).replace('今天 ','');
-  renderMorning(); renderDinner(); renderOrder(); renderBreakfast(); renderRecipes();
+  renderMorning(); renderDinner(); renderOrder(); renderBreakfast(); renderShop(); renderRecipes();
 }
 
 // 早饭答案（妈妈的今天页 + 女儿早饭页顶部）
@@ -476,6 +504,49 @@ function renderBreakfast(){
 }
 $('btnRandom').onclick=function(){ act(api('/api/pick',{method:'POST',json:{type:'random',date:targetDate()}})).then(function(r){ if(r&&r.pick) toast('随便选了：'+r.pick.resolvedName); }); };
 $('btnSkip').onclick=function(){ act(api('/api/pick',{method:'POST',json:{type:'skip',date:targetDate()}}),'好，早饭不吃'); };
+
+// 买菜（全家）
+function plannedGroups(){
+  var out=[], cur=pickIsCurrent()?state.pick:null;
+  if(cur&&cur.type!=='skip'){ var ds=pickedIds(cur).map(dishById).filter(Boolean); if(ds.length) out.push({label:(targetDate()===today()?'今早':'明早')+'早饭', dishes:ds}); }
+  var dd=dinnerDate(), p=state.plans&&state.plans.today, p2=state.plans&&state.plans.tomorrow;
+  [[p, dd===today()?'今晚':'明晚'],[p2, dd===today()?'明晚':'后天晚上']].forEach(function(x){ var pl=x[0]; if(pl&&pl.cook&&pl.cook.dishIds&&pl.cook.dishIds.length){ var ds2=pl.cook.dishIds.map(dishById).filter(Boolean); if(ds2.length) out.push({label:x[1], dishes:ds2}); } });
+  return out;
+}
+function openItem(name){ var l=state.shopping||[]; for(var i=0;i<l.length;i++) if(!l[i].done&&l[i].name===name) return l[i]; return null; }
+function shopAdd(names, from){ names=names.filter(Boolean); if(!names.length) return Promise.resolve(); return act(api('/api/shopping',{method:'POST',json:{op:'add',names:names,from:from||''}}), names.length>1?'加了 '+names.length+' 样':'加了：'+names[0]); }
+function renderShop(){
+  var groups=plannedGroups(), box=$('planBox');
+  if(!loaded) box.innerHTML='<p class="note">正在打开…</p>';
+  else if(!groups.length) box.innerHTML='<p class="note" style="text-align:left;margin:0">还没定要做什么。'+(role==='mom'?'到「今天」页定了晚饭，这里就会列出要买的食材。':'妈妈定了做什么，这里会列出食材。')+'</p>';
+  else box.innerHTML=groups.map(function(g){ return '<h3 class="sec" style="margin:4px 0 8px">'+esc(g.label)+'</h3>'+g.dishes.map(function(d){
+      var ing=d.ingredients||[]; var missing=ing.filter(function(x){ return !openItem(x); });
+      return '<div class="plan-dish" data-id="'+d.id+'"><div class="t">'+esc(d.emoji||'')+' '+esc(d.name)+(ing.length&&missing.length?'<button type="button" data-act="all">都要买</button>':'')+'</div>'
+        +(ing.length?'<div class="chips">'+ing.map(function(x){ var on=!!openItem(x); return '<button type="button" data-ing="'+esc(x)+'" class="'+(on?'on':'')+'">'+(on?'✓ ':'')+esc(x)+'</button>'; }).join('')+'</div>'
+          :'<div class="note" style="text-align:left;margin:0 0 6px">还没填食材</div><div class="row"><button type="button" class="big-btn ghost" data-act="ingvoice">🎤 说食材</button>'+(state.ai?'<button type="button" class="big-btn ghost" data-act="ai">✨ AI 填</button>':'')+'</div><p class="note" data-st style="text-align:left;margin:4px 0 0"></p>')
+        +'</div>'; }).join(''); }).join('');
+  Array.prototype.forEach.call(box.querySelectorAll('.plan-dish'), function(el){
+    var d=dishById(Number(el.getAttribute('data-id'))); if(!d) return;
+    Array.prototype.forEach.call(el.querySelectorAll('[data-ing]'), function(b){ b.onclick=function(){ var x=b.getAttribute('data-ing'), it=openItem(x); if(it) act(api('/api/shopping',{method:'POST',json:{op:'remove',id:it.id}}),'拿掉了'); else shopAdd([x], d.name); }; });
+    Array.prototype.forEach.call(el.querySelectorAll('[data-act]'), function(b){ var a=b.getAttribute('data-act'); b.onclick=function(){
+      if(a==='all') shopAdd((d.ingredients||[]).filter(function(x){ return !openItem(x); }), d.name);
+      else if(a==='ingvoice') voiceCapture({btn:b,status:el.querySelector('[data-st]'),input:null,onText:function(t){ var add=parseList(t); if(add.length) saveIngredients(d, add); else el.querySelector('[data-st]').textContent='没听出食材，再说一次'; }});
+      else if(a==='ai'){ el.querySelector('[data-st]').textContent='AI 正在想…'; api('/api/ingredients',{method:'POST',json:{name:d.name}}).then(function(r){ if(!(r.items||[]).length){ el.querySelector('[data-st]').textContent='AI 没给出食材'; return; } return saveIngredients(d, r.items); }).catch(function(e){ el.querySelector('[data-st]').textContent=e.message||'AI 出错了'; }); }
+    }; });
+  });
+  var items=(state.shopping||[]).slice(), open=items.filter(function(x){ return !x.done; }), done=items.filter(function(x){ return x.done; });
+  $('shopCount').textContent=loaded?(open.length?open.length+' 样':'没有要买的'):'';
+  var fq=(state.frequent||[]).filter(function(n){ return !openItem(n); }).slice(0,8);
+  $('frequentChips').innerHTML=fq.map(function(n){ return '<button type="button" data-n="'+esc(n)+'">＋ '+esc(n)+'</button>'; }).join('');
+  Array.prototype.forEach.call($('frequentChips').querySelectorAll('button'), function(b){ b.onclick=function(){ shopAdd([b.getAttribute('data-n')]); }; });
+  function row(it){ return '<button type="button" class="shop-item'+(it.done?' done':'')+'" data-id="'+it.id+'"><span class="bx">'+(it.done?'✓':'')+'</span><span class="nm">'+esc(it.name)+(it.from?'<small>'+esc(it.from)+'</small>':'')+'</span></button>'; }
+  $('shopList').innerHTML=(open.length||done.length)?open.map(row).join('')+(done.length?'<h3 class="sec">买到了</h3>'+done.map(row).join(''):''):(loaded?'<p class="note">清单是空的。上面点食材，或者说一句要买什么</p>':'');
+  Array.prototype.forEach.call($('shopList').querySelectorAll('.shop-item'), function(b){ b.onclick=function(){ act(api('/api/shopping',{method:'POST',json:{op:'toggle',id:Number(b.getAttribute('data-id'))}})); }; });
+  $('btnClearDone').hidden=!done.length;
+}
+$('shopForm').onsubmit=function(e){ e.preventDefault(); var add=parseList($('shopInput').value); if(!add.length) return; shopAdd(add).then(function(){ $('shopInput').value=''; }); };
+$('btnShopVoice').onclick=function(){ voiceCapture({btn:$('btnShopVoice'),status:$('shopStatus'),input:$('shopInput'),onText:function(t){ var add=parseList(t); if(!add.length){ $('shopStatus').textContent='没听清，请再说一次'; return; } shopAdd(add); }}); };
+$('btnClearDone').onclick=function(){ act(api('/api/shopping',{method:'POST',json:{op:'clear_done'}}),'清掉了'); };
 
 // 菜谱（全家）
 function dishRow(d, i, n){
