@@ -129,6 +129,11 @@ h3.sec{font-size:22px;color:var(--muted);margin:18px 0 8px}
 .detail .acts .del.confirm{background:var(--bad);border-color:var(--bad);color:#fff}
 .detail .acts input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .detail .ing{margin:6px 0 10px}
+.ingchip{display:inline-flex;border:2px solid var(--line);border-radius:999px;overflow:hidden;background:var(--bg)}
+.ingchip button{border:none;background:transparent;font-size:22px;padding:10px 12px}
+.ingchip button.buy.on{background:var(--accent)}
+.ingchip button.rm{border-left:2px solid var(--line);color:var(--muted);font-size:18px;padding:10px 10px}
+.chips .ingchip{max-width:100%}
 /* 买菜 */
 .chips button .tag{font-size:14px;padding:1px 6px;border-radius:999px;background:var(--pick);color:#fff;font-weight:700}
 .plan-dish{border-top:2px solid var(--line);padding:10px 0}
@@ -579,7 +584,9 @@ function dishRow(d, i, n){
     +'<button type="button" class="open" data-act="toggle">'+(open?'收起':'详情')+'</button></div>';
   if(open){
     var ing=(d.ingredients||[]);
-    html+='<div class="detail"><div class="chips ing">'+(ing.length?ing.map(function(x){ return '<button type="button" data-act="rming" data-x="'+esc(x)+'">'+esc(x)+' ✕</button>'; }).join(''):'<span class="note" style="margin:0">还没填食材，说一句就行，比如「五花肉、冰糖、八角」</span>')+'</div>'
+    var missing=ing.filter(function(x){ return !openItem(x); });
+    html+='<div class="detail">'+(ing.length?'<div class="note" style="text-align:left;margin:0 0 6px">点食材进要买清单，点 ✕ 从菜谱删掉'+(missing.length?' <button type="button" data-act="buyall" style="font-size:19px;padding:6px 12px;border-radius:12px;border:2px solid var(--accent-deep);background:var(--paper);margin-left:6px">都要买</button>':'')+'</div>':'')
+      +'<div class="chips ing">'+(ing.length?ing.map(function(x){ var on=!!openItem(x); return '<span class="ingchip"><button type="button" class="buy'+(on?' on':'')+'" data-act="buy" data-x="'+esc(x)+'">'+(on?'✓ ':'')+esc(x)+'</button><button type="button" class="rm" data-act="rming" data-x="'+esc(x)+'" aria-label="从菜谱删掉">✕</button></span>'; }).join(''):'<span class="note" style="margin:0">还没填食材，说一句就行，比如「五花肉、冰糖、八角」</span>')+'</div>'
       +'<div class="add-row"><input id="ingInput" placeholder="说食材或打字，用顿号分开" autocomplete="off"><button type="button" class="mic" data-act="ingvoice">🎤</button><button type="button" class="big-btn" data-act="ingadd">加</button></div>'
       +'<p class="note" id="ingStatus" style="text-align:left"></p>'
       +'<div class="acts">'+(state.ai?'<button type="button" data-act="ai">✨ AI 帮我填食材</button>':'')
@@ -610,6 +617,8 @@ function recipeAction(a, d, el, li){
   var ing=(d.ingredients||[]).slice();
   if(a==='toggle'){ expandedId=expandedId===d.id?null:d.id; pendingDelete=null; renderRecipes(); return; }
   if(a==='rming'){ var x=el.getAttribute('data-x'); saveIngredients(d, ing.filter(function(y){ return y!==x; })); return; }
+  if(a==='buy'){ var bx=el.getAttribute('data-x'), it=openItem(bx); if(it) act(api('/api/shopping',{method:'POST',json:{op:'remove',id:it.id}}),'从要买里拿掉了'); else shopAdd([bx], d.name); return; }
+  if(a==='buyall'){ shopAdd(ing.filter(function(y){ return !openItem(y); }), d.name); return; }
   if(a==='ingadd'){ var v=li.querySelector('#ingInput').value; var add=parseList(v); if(!add.length) return; saveIngredients(d, ing.concat(add.filter(function(y){ return ing.indexOf(y)<0; }))); return; }
   if(a==='ingvoice'){ voiceCapture({btn:el,status:li.querySelector('#ingStatus'),input:li.querySelector('#ingInput'),onText:function(t){ var add=parseList(t); if(!add.length){ li.querySelector('#ingStatus').textContent='没听出食材，再说一次'; return; } saveIngredients(d, ing.concat(add.filter(function(y){ return ing.indexOf(y)<0; }))); }}); return; }
   if(a==='ai'){ li.querySelector('#ingStatus').textContent='AI 正在想…'; api('/api/ingredients',{method:'POST',json:{name:d.name}}).then(function(r){ var items=(r.items||[]).filter(function(y){ return ing.indexOf(y)<0; }); if(!items.length){ li.querySelector('#ingStatus').textContent='AI 没给出新的食材'; return; } return saveIngredients(d, ing.concat(items)); }).catch(function(e){ li.querySelector('#ingStatus').textContent=e.message||'AI 出错了'; }); return; }
