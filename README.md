@@ -8,11 +8,11 @@ A tiny shared "what's for breakfast" app for a parent and a child. Chinese UI, b
 
 一个菜库、一个心愿单、每天一个答案。妈妈只做三件事：看、点一下、说一句。
 
-页签：妈妈看到「小饭桌 · 菜篮子 · 菜谱本」，女儿和小陈看到「点个菜 · 早饭碗 · 菜篮子 · 菜谱本」。
+页签：妈妈看到「小饭桌 · 菜篮子 · 菜谱本」，女儿和小陈看到「点个菜 · 选早饭 · 菜篮子 · 菜谱本」。
 
 - **妈妈的「小饭桌」页**：早饭答案（大图大字、读给我听）；晚饭几个人回来吃、每人想吃什么；「今晚做」点开就是候选：心愿单里的菜排最前（谁想吃、等了几天），其次是拿手菜，点一个或几个就定了，全家都看到。顺手还能定明晚。
 - **女儿、小陈的「点个菜」页**：今晚回不回来吃两个大按钮；想吃什么从妈妈的菜库里点，像点外卖，进心愿单，不绑定日期；也可以说一道菜库里没有的。心愿单上能看到妈妈安排到哪天、哪些做过了。
-- **「早饭碗」页**（女儿、小陈）：选明早的早饭，可以多选；早上 6 点没选自动随机。
+- **「选早饭」页**（女儿、小陈）：选明早的早饭，可以多选；早上 6 点没选自动随机。
 - **「菜谱本」页**（全家）：说一道菜的名字就加进去；食材也可以说，或者让 AI 填；拍照、设为拿手菜、按住 ☰ 拖动排序、删除。做过的菜自动记上次日期和次数。
 - **语音**：所有要输入的地方都有 🎤。配置了 Qwen 的 key 时走后端录音识别（微信里也能用）：手机先把录音转成 16k 的 WAV，后端调百炼原生的 `multimodal-generation` 接口（Token Plan 套餐的 `qwen-audio-3.0-asr-flash` 不走 OpenAI 兼容接口，且 `parameters.format` 必填）；否则用浏览器自带识别；再不行提示用键盘话筒。
 - **规则**：下午 5 点没说算回来吃；晚上 8 点后页面切到明晚；过了的计划自动结算，心愿变「做过了」。
@@ -28,6 +28,18 @@ A tiny shared "what's for breakfast" app for a parent and a child. Chinese UI, b
 - **提意见**：每页底部和个人面板里都有，存在数据库的 `feedback` 里（不会下发到网页）。
 - **妈妈的手机通知 🔔**：小饭桌顶上（或点头像）点「打开通知」。之后有人说不回来吃、点菜、选好早饭、包红包、红包发了，妈妈的手机会弹一条通知，点开就是「吃什么」。同一个人 30 秒内的几下操作合成一条，点错马上取消的不发。用的是浏览器自带的 Web Push（`docs/sw.js` + 后端 `push.ts`），不需要装别的 App、不需要第三方账号；推送用的钥匙第一次用时自动生成，存在数据库里。iPhone 要 iOS 16.4 以上，并且必须先「添加到主屏幕」、从桌面图标打开；微信里收不到。
 
+**第三轮反馈之后加的**
+
+- **通知能看到内容**：点开手机通知，网页会把那条通知的内容弹出来；每页下面有「📣 最近的动态」，发过的通知都在，没打开通知也能看。个人面板的通知那里写着通知长什么样。
+- **朗读修好**：按句子一段一段读，刚停下马上再读也出声；读的内容同时显示在按钮下面，两秒半没出声就提示看静音键和音量。
+- **点菜页顺序**：回来吃 → 妈妈说 → 我的红包 → 心愿单 → 点菜。点好一道菜当场问一句要不要包红包，不用再去心愿单里找。
+- **红包账本 🧧**：妈妈点「🍚 做好了」（或过了夜自动结算）时，点了这道菜的红包就记进账本：谁、哪道菜、多少、那句话、发了没；妈妈看「还没收到多少、这个月一共多少」，女儿小陈看「我还没发多少」，发了点一下「红包发了」。
+- **暖心话**：妈妈定好菜时说一句「女儿点的，等了 3 天，还有红包 $20，一定很开心」；点「做好了」弹一屏「做好啦！收到 2 个红包」；过了夜自动结算的红包，妈妈打开时顶上也会说一句。
+- **一周计划**：晚饭能从今晚起排 7 天；平时只摊开三天，「再往后几天」点开才看全部，不占屏。菜篮子里「做菜要用」标着哪天哪道菜，想吃但还没排日子的菜的食材也列出来，好提前买。
+- **全家都能开通知**：女儿、小陈打开「提醒」后，晚上 8 点没选明早早饭、早上 9 点和下午 3 点还没说今晚回不回来，手机会提醒；妈妈定了做什么、做好了也会收到。妈妈下午 4 点还没定今晚做什么也会收到一条。定时靠 `pg_cron` 每 15 分钟调一次 `/api/cron`（见 `supabase/migrations/20261115000000_cron_reminders.sql`，换项目要改里面的地址），时间按家里手机报上来的时区算；还没有手机打开过新网页（不知道时区）时一条都不发。
+- **点菜名看菜谱**：心愿单里、妈妈晚饭板上「想吃 xx」的菜名都能点，点了跳到「菜谱本」把这道菜展开：看食材和照片，食材旁边点「买」就进菜篮子。
+- **红包改成 $**：家里在美国，`docs/config.js` 里 `HONGBAO.unit` 改成 `$`，金额 5 / 10 / 20 / 50；通知里的符号由函数环境变量 `HB_UNIT` 控制（默认 `$`）。
+
 ## 结构
 
 ```
@@ -38,7 +50,7 @@ docs/version.txt                       网页版本号；改了网页就顺手�
 docs/icon.png, docs/manifest.webmanifest  主屏幕图标与安装信息
 supabase/functions/breakfast/index.ts  后端：Supabase Edge Function，只提供接口
 supabase/functions/breakfast/push.ts   Web Push 加密和签名（只用 WebCrypto）
-supabase/migrations/...sql             一张表（一行 JSON）+ 一个公开图片桶
+supabase/migrations/...sql             一张表（一行 JSON）+ 一个公开图片桶；定时提醒的 pg_cron 任务
 ```
 
 为什么前后端分开：Supabase 自带的 `*.supabase.co` 域名不允许云函数返回 HTML 页面（会被改成纯文本），所以网页放 GitHub Pages，接口放 Supabase。两边都免费。
@@ -64,7 +76,9 @@ supabase/migrations/...sql             一张表（一行 JSON）+ 一个公开�
 2. 仓库 Settings → Pages → Source 选 `main` 分支的 `/docs` 目录。
 3. 一分钟后打开 `https://<你的用户名>.github.io/<仓库名>/`，把这个链接发给家人。
 
-可选：在 Supabase 后台 Edge Functions → Secrets 添加 `DASHSCOPE_API_KEY`（阿里云百炼 / Model Studio 的 key），就同时开启后端语音识别（`qwen3-asr-flash`）和 AI 填食材（`qwen-flash`）。Token Plan 套餐的 key（`sk-sp-` 开头）会自动走套餐地址；普通 key 默认走国际站新加坡地址，国内站把 `DASHSCOPE_BASE_URL` 设成 `https://dashscope.aliyuncs.com/compatible-mode/v1`。套餐不含语音模型时，可以另配一把按量付费的 `QWEN_ASR_API_KEY` 只给语音用。模型可用 `QWEN_ASR_MODEL`、`QWEN_CHAT_MODEL` 改。打开 `<接口地址>/api/qwen-check` 能自检 key 和地址。不配也能用。函数环境变量 `ALLOWED_ORIGIN` 设成你的 Pages 地址（如 `https://xxx.github.io`）可以限制只有这个网页能调接口；`BREAKFAST_TZ`（默认 `Asia/Shanghai`）只在手机没传日期时兜底用。
+定时提醒：`supabase db push` 会顺带建好 `pg_cron` 任务（每 15 分钟调一次 `/api/cron`）。Fork 的话先把 `supabase/migrations/20261115000000_cron_reminders.sql` 里的地址改成你的接口地址。
+
+可选：在 Supabase 后台 Edge Functions → Secrets 添加 `DASHSCOPE_API_KEY`（阿里云百炼 / Model Studio 的 key），就同时开启后端语音识别（`qwen3-asr-flash`）和 AI 填食材（`qwen-flash`）。Token Plan 套餐的 key（`sk-sp-` 开头）会自动走套餐地址；普通 key 默认走国际站新加坡地址，国内站把 `DASHSCOPE_BASE_URL` 设成 `https://dashscope.aliyuncs.com/compatible-mode/v1`。套餐不含语音模型时，可以另配一把按量付费的 `QWEN_ASR_API_KEY` 只给语音用。模型可用 `QWEN_ASR_MODEL`、`QWEN_CHAT_MODEL` 改。打开 `<接口地址>/api/qwen-check` 能自检 key 和地址。不配也能用。函数环境变量 `ALLOWED_ORIGIN` 设成你的 Pages 地址（如 `https://xxx.github.io`）可以限制只有这个网页能调接口；`BREAKFAST_TZ`（默认 `Asia/Shanghai`）只是兜底：家里的时区由手机打开网页时自动报上来存着，定时提醒按它算。
 
 ## 给老人手机装上
 

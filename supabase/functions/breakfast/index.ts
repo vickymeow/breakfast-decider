@@ -2,7 +2,7 @@
 // 数据全部在 breakfast_state 表的一行 JSON 里（见 Db 类型），照片在 breakfast 存储桶。
 // 语音识别与食材建议用阿里云百炼的 Qwen（OpenAI 兼容接口），配置 DASHSCOPE_API_KEY 即开启。
 //
-//   GET  /api/state?date&hour&ddate     全部状态；顺带做：6 点自动随机早饭、过期晚饭计划结算
+//   GET  /api/state?date&hour&ddate&tz  全部状态；顺带做：6 点自动随机早饭、过期晚饭计划结算；tz = 手机的时区，记下来给定时提醒用
 //   POST /api/pick        {type, ids, date, who}     早饭选择（多选）
 //   POST /api/dishes      {name, cat, ingredients, mom, by}   加菜（菜库）
 //   POST /api/dishes/:id/update {name?, cat?, mom?, ingredients?}
@@ -17,6 +17,11 @@
 //   POST /api/push/unsubscribe {who, endpoint}
 //   POST /api/push/test        {who}                 发一条试试
 //   有人说不回来吃、点菜、选好早饭、包红包、红包发了 → 给妈妈的手机发通知（同一个人 30 秒内的动作合成一条）
+//   妈妈定了做什么、做好了 → 给女儿、小陈的手机发通知。每条通知同时记在 inbox 里，网页上「最近的动态」能看到内容
+//   POST /api/dinner/done  {date}                     妈妈点「做好了」：这天的晚饭当场结算（菜记一次、心愿变做过了、红包进账本）
+//   POST /api/hb/paid      {who, ids:[]}              红包发了（账本 ledger 里的条目标成已发）
+//   GET/POST /api/cron                                定时提醒（pg_cron 每 15 分钟调一次；按家里的时区，每条每天只发一次）:
+//        晚上 8 点没选明早早饭 → 提醒女儿、小陈；早上 9 点、下午 3 点没说今晚回不回来 → 提醒本人；下午 4 点妈妈还没定今晚做什么 → 提醒妈妈
 //   POST /api/profile/:who/photo （请求体是图片）     头像
 //   POST /api/feedback    {who, text}                 提意见（存在 feedback 里，不随 state 下发）
 //   POST /api/suggest     {cat}                       Qwen 推荐几道菜单里没有的新菜
@@ -72,17 +77,25 @@ type Reply = { home: boolean | null; at: string };
 type Plan = { date: string; replies: Record<string, Reply>; cook: { dishIds: number[]; text: string; at: string } | null; done?: boolean };
 type Wish = { id: number; dishId: number; who: string; at: string; status: "open" | "planned" | "done"; plannedFor?: string; doneAt?: string; hb?: number; hbMsg?: string; hbPaid?: boolean };
 type Feedback = { id: number; who: string; text: string; at: string; done?: boolean };
+// 红包账本：菜做好了（结算时）心愿上的红包记进来，谁、哪道菜、多少、哪天做的、发了没
+type Ledger = { id: number; wishId: number; who: string; dishId: number; name: string; hb: number; msg?: string; date: string; paidAt?: string };
+// 发过的通知（给谁、谁引起的、内容），网页上「最近的动态」看
+type Inbox = { id: number; to: string; from: string; body: string; at: string };
 type ShopItem = { id: number; name: string; done: boolean; from?: string; at: string; doneAt?: string };
 type Db = { v: number; dishes: Dish[]; pick: Pick | null; pickDate: string | null; plans: Record<string, Plan>; wishes: Wish[]; shopping: ShopItem[]; shopHistory: Record<string, number>; profiles: Record<string, { avatar?: string }>; feedback: Feedback[]; orderV?: number; staples?: string[];
-  push?: Record<string, (PushSub & { at: string })[]>; vapid?: Vapid; notify?: Record<string, { evs: Ev[]; token: number; at: string }> };
-// 要告诉妈妈的动态：先记下来，30 秒内没有新动作再按当时的情况合成一条发出去（点错马上取消的就不发了）
-type Ev = { k: "wish" | "hb" | "paid" | "away" | "pick"; id?: number; date?: string };
+  push?: Record<string, (PushSub & { at: string })[]>; vapid?: Vapid; notify?: Record<string, { evs: Ev[]; token: number; at: string }>;
+  tz?: string; ledger?: Ledger[]; ledgerV?: number; inbox?: Inbox[]; reminded?: Record<string, string> };
+// 要告诉家里人的动态：先记下来，30 秒内没有新动作再按当时的情况合成一条发出去（点错马上取消的就不发了）
+// 女儿、小陈的动作发给妈妈；妈妈的动作（定了做什么、做好了）发给女儿、小陈
+type Ev = { k: "wish" | "hb" | "paid" | "lpaid" | "away" | "pick" | "cook" | "made"; id?: number; date?: string };
 const MEMBERS = ["kid", "jim"];
 const PEOPLE = ["mom", "kid", "jim"];
 const NAMES: Record<string, string> = { mom: "妈妈", kid: "女儿", jim: "小陈" };
 const NOTIFY_TO = "mom";
 const NOTIFY_DELAY_MS = 30000;
-const HB_UNIT = Deno.env.get("HB_UNIT") ?? "¥";
+const HB_UNIT = Deno.env.get("HB_UNIT") ?? "$";
+const UNSURE = "还没想好";
+const INBOX_MAX = 40;
 // 推送服务要求带一个联系方式；用不对外的占位地址，可以用 VAPID_SUBJECT 改
 const PUSH_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:noreply@example.com";
 const cleanMsg = (v: unknown) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, 20);
@@ -115,6 +128,16 @@ function migrate(raw: any): { db: Db; changed: boolean } {
     if (!Array.isArray(db.feedback)) { db.feedback = []; changed = true; }
     // 常买由家里人自己加，一开始是空的（不再用写死的牛奶鸡蛋补齐）
     if (!Array.isArray(db.staples)) { db.staples = []; changed = true; }
+    if (!Array.isArray(db.ledger)) { db.ledger = []; changed = true; }
+    if (!Array.isArray(db.inbox)) { db.inbox = []; changed = true; }
+    if (!db.ledgerV) {
+      // 一次性：以前做过的、带红包的心愿补进账本
+      for (const w of db.wishes) if (w.status === "done" && w.hb && !db.ledger.some((e) => e.wishId === w.id)) {
+        const d = db.dishes.find((x) => x.id === w.dishId);
+        db.ledger.push({ id: w.id, wishId: w.id, who: w.who, dishId: w.dishId, name: d?.name || "菜", hb: w.hb, msg: w.hbMsg, date: w.doneAt || nowIso().slice(0, 10), paidAt: w.hbPaid ? nowIso() : undefined });
+      }
+      db.ledgerV = 1; changed = true;
+    }
     if (!db.orderV) {
       // 一次性：正餐按「新加的在上面」重排（早饭的手动顺序不动）；之后新菜都插在最前
       const dinner = db.dishes.filter((d) => d.cat === "dinner").sort((a, b) => b.id - a.id);
@@ -173,16 +196,30 @@ function syncWishes(db: Db) {
     else { w.status = "open"; delete w.plannedFor; }
   }
 }
-// 过了的计划结算：菜记一次“做过”，心愿变“做过了”；清掉太老的计划和心愿
+// 一天的晚饭结算：菜记一次“做过”，心愿变“做过了”，心愿上的红包记进账本
+function finishPlan(db: Db, p: Plan): { made: Dish[]; hb: Ledger[] } {
+  const made: Dish[] = [], hb: Ledger[] = [];
+  const ledger = db.ledger || (db.ledger = []);
+  if (p.cook) for (const id of p.cook.dishIds) {
+    const d = db.dishes.find((x) => x.id === id); if (d) { d.times = (d.times || 0) + 1; d.lastMade = p.date; made.push(d); }
+    for (const w of db.wishes) if (w.status !== "done" && w.dishId === id) {
+      w.status = "done"; w.doneAt = p.date;
+      if (w.hb && !ledger.some((e) => e.wishId === w.id)) {
+        const e: Ledger = { id: Date.now() + ledger.length + Math.floor(Math.random() * 1000), wishId: w.id, who: w.who, dishId: id, name: d?.name || "菜", hb: w.hb, msg: w.hbMsg, date: p.date, paidAt: w.hbPaid ? nowIso() : undefined };
+        ledger.push(e); hb.push(e);
+      }
+    }
+  }
+  if (ledger.length > 200) db.ledger = ledger.slice(-200);
+  p.done = true;
+  return { made, hb };
+}
+// 过了的计划自动结算；清掉太老的计划和心愿
 function settle(db: Db, today: string): boolean {
   let changed = false;
   for (const p of Object.values(db.plans)) {
     if (p.done || p.date >= today) continue;
-    if (p.cook) for (const id of p.cook.dishIds) {
-      const d = db.dishes.find((x) => x.id === id); if (d) { d.times = (d.times || 0) + 1; d.lastMade = p.date; }
-      for (const w of db.wishes) if (w.status !== "done" && w.dishId === id) { w.status = "done"; w.doneAt = p.date; }
-    }
-    p.done = true; changed = true;
+    finishPlan(db, p); changed = true;
   }
   for (const k of Object.keys(db.plans)) if (k < addDays(today, -3)) { delete db.plans[k]; changed = true; }
   const before = db.wishes.length;
@@ -205,12 +242,19 @@ function autoPickIfDue(db: Db, date: string, hour: number): boolean {
   db.pickDate = date;
   return true;
 }
-function targetDate(): string {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit" }).formatToParts(new Date());
-  const get = (t: string) => parts.find((p) => p.type === t)!.value;
-  const d = new Date(Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day"))));
-  if (Number(get("hour")) % 24 >= 15) d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
+// 家里的时区：手机打开网页时报上来的（db.tz），没有就用环境变量
+function validTz(tz: string): boolean { try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); return /^[A-Za-z_]+\/[A-Za-z_\/+-]+$|^UTC$/.test(tz); } catch { return false; } }
+function localNow(db?: Db): { date: string; hour: number; minutes: number } {
+  const tz = (db?.tz && validTz(db.tz)) ? db.tz : TZ;
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: tz, hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(new Date());
+  const get = (t: string) => Number(parts.find((p) => p.type === t)!.value);
+  const date = new Date(Date.UTC(get("year"), get("month") - 1, get("day"))).toISOString().slice(0, 10);
+  const hour = get("hour") % 24;
+  return { date, hour, minutes: hour * 60 + get("minute") };
+}
+function targetDate(db?: Db): string {
+  const n = localNow(db);
+  return n.hour >= 15 ? addDays(n.date, 1) : n.date;
 }
 
 // ---- 给妈妈的手机发通知 ----
@@ -221,9 +265,18 @@ function inBackground(p: Promise<unknown>) {
 }
 const weekdayOf = (date: string) => "周" + "日一二三四五六"[new Date(date + "T00:00:00Z").getUTCDay()];
 const hbLine = (w: Wish) => `🧧${HB_UNIT}${w.hb}${w.hbMsg ? " " + w.hbMsg : ""}`;
-// 记一条动态；妈妈没打开通知就不记。返回给 scheduleNotify 用的凭据
+const dishNames = (db: Db, ids: number[]) => ids.map((id) => db.dishes.find((d) => d.id === id)?.name || "").filter(Boolean).join("、");
+// 这条动态发给谁：女儿、小陈的 → 妈妈；妈妈的 → 女儿、小陈
+const recipientsOf = (who: string) => who === "mom" ? MEMBERS : [NOTIFY_TO];
+// 记一条到收件箱（网页上「最近的动态」看得到，没打开通知也有）
+function inboxAdd(db: Db, to: string, from: string, body: string) {
+  const box = db.inbox || (db.inbox = []);
+  box.push({ id: Date.now() + Math.floor(Math.random() * 1000), to, from, body, at: nowIso() });
+  if (box.length > INBOX_MAX) db.inbox = box.slice(-INBOX_MAX);
+}
+// 记一条动态。返回给 scheduleNotify 用的凭据
 function queueNotify(db: Db, who: string, ev: Ev): { who: string; token: number } | null {
-  if (!MEMBERS.includes(who) || !(db.push?.[NOTIFY_TO] || []).length) return null;
+  if (!PEOPLE.includes(who)) return null;
   const notify = db.notify || (db.notify = {});
   const q = notify[who] || (notify[who] = { evs: [], token: 0, at: nowIso() });
   if (!q.evs.some((e) => e.k === ev.k && e.id === ev.id && e.date === ev.date)) q.evs.push(ev);
@@ -243,8 +296,22 @@ function describe(db: Db, who: string, evs: Ev[]): string[] {
     if (e.k === "wish") { const x = wishOf(e.id); if (x && x.w.status !== "done") lines.push(`点了 ${x.d.name}` + (x.w.hb ? `（${hbLine(x.w)}）` : "")); }
     else if (e.k === "hb") { if (ordered.has(e.id)) continue; const x = wishOf(e.id); if (x && x.w.hb && !x.w.hbPaid) lines.push(`给 ${x.d.name} 包了 ${hbLine(x.w)}`); }
     else if (e.k === "paid") { const x = wishOf(e.id); if (x && x.w.hb && x.w.hbPaid) lines.push(`红包发了 🧧${HB_UNIT}${x.w.hb}（${x.d.name}）`); }
+    else if (e.k === "lpaid") { const l = (db.ledger || []).find((x) => x.id === e.id); if (l && l.paidAt) lines.push(`红包发了 🧧${HB_UNIT}${l.hb}（${l.name}）`); }
     else if (e.k === "away" && e.date) { const r = db.plans[e.date]?.replies?.[who]; if (r && r.home === false) lines.push(`${weekdayOf(e.date)}晚上不回来吃`); }
     else if (e.k === "pick" && e.date) { if (db.pick && db.pickDate === e.date) lines.push(db.pick.type === "skip" ? `${weekdayOf(e.date)}早饭不吃` : `${weekdayOf(e.date)}早饭选好了：${db.pick.resolvedName}`); }
+    // 妈妈的动作
+    else if (e.k === "cook" && e.date) {
+      const p = db.plans[e.date]; if (!p?.cook || p.done) continue;
+      const names = dishNames(db, p.cook.dishIds);
+      if (names) lines.push(`${weekdayOf(e.date)}晚上做 ${names}${p.cook.text ? "、" + p.cook.text : ""}`);
+      else if (p.cook.text && p.cook.text !== UNSURE) lines.push(`${weekdayOf(e.date)}晚上${p.cook.text}`);
+    }
+    else if (e.k === "made" && e.date) {
+      const p = db.plans[e.date]; if (!p?.cook || !p.done) continue;
+      const names = dishNames(db, p.cook.dishIds);
+      const owe = (db.ledger || []).filter((l) => l.date === e.date && !l.paidAt);
+      lines.push(`${names || "晚饭"} 做好了，回家吃饭啦 🍚` + (owe.length ? `。点了菜的记得给妈妈发红包 🧧` : ""));
+    }
   }
   return lines;
 }
@@ -254,9 +321,57 @@ async function flushNotify(who: string, token: number | null) {
   const q = db.notify?.[who];
   if (!q || (token !== null && q.token !== token)) return;
   delete db.notify![who];
-  await saveDb(db);
   const lines = describe(db, who, q.evs);
-  if (lines.length) await pushTo(db, NOTIFY_TO, { title: "吃什么 · 家里有新动态", body: `${NAMES[who]}：${lines.join("；")}`, tag: "breakfast-" + who });
+  const tos = recipientsOf(who);
+  const body = `${NAMES[who]}：${lines.join("；")}`;
+  if (lines.length) for (const to of tos) inboxAdd(db, to, who, body);
+  await saveDb(db);
+  if (lines.length) for (const to of tos) await pushTo(db, to, { title: who === "mom" ? "吃什么 · 妈妈说" : "吃什么 · 家里有新动态", body, tag: "breakfast-" + who });
+}
+// ---- 定时提醒（/api/cron 每 15 分钟被调一次）----
+// 每条规则有个时间窗口，窗口里第一次跑到就发，同一天不重发；按家里的时区算
+type Rule = { key: string; from: number; to: number; targets: (db: Db, date: string) => { to: string; title: string; body: string }[] };
+const H = (h: number, m = 0) => h * 60 + m;
+const RULES: Rule[] = [
+  { key: "bf", from: H(20), to: H(22), targets: (db, date) => {
+    const tmr = addDays(date, 1);
+    if (db.pick && db.pickDate === tmr) return [];
+    return MEMBERS.map((to) => ({ to, title: "吃什么 · 明早吃什么？", body: `还没选明早的早饭。不选的话早上 ${AUTO_PICK_HOUR} 点就随机一个，打开选一下 🥐` }));
+  } },
+  { key: "dn1", from: H(9), to: H(11), targets: (db, date) => MEMBERS.filter((m) => noReply(db, date, m)).map((to) => ({ to, title: "吃什么 · 今晚回来吃吗？", body: "告诉妈妈一下今晚回不回来吃，想吃什么顺便点一个 🍲" })) },
+  { key: "dn2", from: H(15), to: H(16, 30), targets: (db, date) => MEMBERS.filter((m) => noReply(db, date, m)).map((to) => ({ to, title: "吃什么 · 今晚回来吃吗？", body: "还没说今晚回不回来。下午 5 点还没说，妈妈就按回来吃算了" })) },
+  { key: "mom", from: H(16), to: H(17, 30), targets: (db, date) => {
+    const p = db.plans[date];
+    if (p?.cook || p?.done) return [];
+    if (!MEMBERS.some((m) => p?.replies?.[m]?.home !== false)) return [];   // 都说了不回来
+    const wish = db.wishes.filter((w) => w.status !== "done").sort((a, b) => (b.hb || 0) - (a.hb || 0)).map((w) => db.dishes.find((d) => d.id === w.dishId)?.name || "").filter((x, i, a) => x && a.indexOf(x) === i).slice(0, 3);
+    const home = MEMBERS.filter((m) => p?.replies?.[m]?.home !== false).map((m) => NAMES[m]).join("、");
+    return [{ to: "mom", title: "吃什么 · 今晚做什么？", body: `${home}回来吃，今晚做什么还没定。` + (wish.length ? `他们想吃：${wish.join("、")}` : "打开点一下就定了") }];
+  } },
+];
+function noReply(db: Db, date: string, who: string): boolean { const r = db.plans[date]?.replies?.[who]; return !r || r.home === null; }
+async function runReminders(): Promise<{ date: string; minutes: number; sent: string[]; skipped?: string }> {
+  const { db } = await loadDb();
+  // 还不知道家里在哪个时区（新网页还没被打开过）就先不发，免得半夜提醒
+  if (!db.tz || !validTz(db.tz)) return { date: "", minutes: -1, sent: [], skipped: "no tz yet" };
+  const { date, minutes } = localNow(db);
+  const rem = db.reminded || (db.reminded = {});
+  let pruned = false;
+  for (const k of Object.keys(rem)) if (rem[k] < addDays(date, -2)) { delete rem[k]; pruned = true; }
+  const out: { to: string; title: string; body: string }[] = [], sent: string[] = [];
+  for (const r of RULES) {
+    if (minutes < r.from || minutes > r.to) continue;
+    for (const t of r.targets(db, date)) {
+      const k = `${r.key}:${t.to}`;
+      if (rem[k] === date) continue;
+      rem[k] = date; out.push(t); sent.push(k);
+      inboxAdd(db, t.to, "sys", t.body);
+    }
+  }
+  // 只有真发了（或清了旧记录）才写库：每 15 分钟空跑一次时不碰数据，免得盖掉家里人刚点的
+  if (out.length || pruned) await saveDb(db);
+  for (const t of out) await pushTo(db, t.to, { title: t.title, body: t.body, tag: "breakfast-remind" });
+  return { date, minutes, sent };
 }
 async function pushTo(db: Db, to: string, data: Record<string, unknown>): Promise<number[]> {
   const subs = db.push?.[to] || [];
@@ -431,7 +546,7 @@ Deno.serve(async (req: Request) => {
   if (m === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders() });
 
   try {
-    if (m === "GET" && path === "/") return json({ ok: true, hint: "这是早饭决定器的接口；网页请打开 GitHub Pages 的地址。", qwenKey: DASHSCOPE_API_KEY ? "已配置" : "没有读到 DASHSCOPE_API_KEY", tokenPlan: IS_TOKEN_PLAN, qwenBase: DASHSCOPE_BASE_URL, asrBase: ASR_BASE_URL, asrModel: QWEN_ASR_MODEL, chatModel: QWEN_CHAT_MODEL });
+    if (m === "GET" && path === "/") return json({ ok: true, hint: "这是早饭决定器的接口；网页请打开 GitHub Pages 的地址。", tz: TZ, qwenKey: DASHSCOPE_API_KEY ? "已配置" : "没有读到 DASHSCOPE_API_KEY", tokenPlan: IS_TOKEN_PLAN, qwenBase: DASHSCOPE_BASE_URL, asrBase: ASR_BASE_URL, asrModel: QWEN_ASR_MODEL, chatModel: QWEN_CHAT_MODEL });
 
     // 自检：key 的样子 + 几个地址哪个认这把 key（不泄露 key 本身）
     if (m === "GET" && path === "/api/qwen-check") {
@@ -463,11 +578,20 @@ Deno.serve(async (req: Request) => {
       } catch (e) { return json({ error: String(e) }, 502); }
     }
 
+    if ((m === "GET" || m === "POST") && path === "/api/cron") {
+      const r = await runReminders();
+      const { db } = await loadDb();
+      for (const [w, q] of Object.entries(db.notify || {})) if (Date.now() - Date.parse(q.at) > NOTIFY_DELAY_MS * 3) inBackground(flushNotify(w, null));
+      return json(r);
+    }
+
     if (m === "GET" && path === "/api/state") {
       let { db, changed } = await loadDb();
       const qDate = url.searchParams.get("date") || "";
       const qHour = Number(url.searchParams.get("hour"));
       const dDate = url.searchParams.get("ddate") || "";
+      const qTz = url.searchParams.get("tz") || "";
+      if (qTz && qTz !== db.tz && validTz(qTz)) { db.tz = qTz; changed = true; }
       if (DATE_RE.test(qDate)) {
         changed = settle(db, qDate) || changed;
         if (Number.isInteger(qHour) && qHour >= 0 && qHour <= 23) changed = autoPickIfDue(db, qDate, qHour) || changed;
@@ -479,20 +603,21 @@ Deno.serve(async (req: Request) => {
       // 兜底：有记下来却很久没发出去的动态（后台计时被打断了），现在补发
       for (const [w, q] of Object.entries(db.notify || {})) if (Date.now() - Date.parse(q.at) > NOTIFY_DELAY_MS * 3) inBackground(flushNotify(w, null));
       const dayPlan = (n: number): Plan => db.plans[addDays(dDate, n)] || { date: addDays(dDate, n), replies: {}, cook: null };
-      // today / tomorrow 留给还没刷新的旧网页；新网页用 days（今晚、明晚、后天）
-      const plans = DATE_RE.test(dDate) ? { today: db.plans[dDate], tomorrow: dayPlan(1), days: [db.plans[dDate], dayPlan(1), dayPlan(2)] } : {};
+      // today / tomorrow 留给还没刷新的旧网页；新网页用 days（从今晚起 7 天，可以提前排一周）
+      const plans = DATE_RE.test(dDate) ? { today: db.plans[dDate], tomorrow: dayPlan(1), days: [0, 1, 2, 3, 4, 5, 6].map(dayPlan) } : {};
       // 常买：家里人自己加的；recent 是最近买得多的，改常买时可以一点就加
       const staples = db.staples || [];
       const recent = Object.entries(db.shopHistory).sort((a, b) => b[1] - a[1]).map(([n]) => n).filter((n) => !staples.includes(n)).slice(0, 16);
       // frequent 留给还没刷新的旧网页
-      return json({ dishes: db.dishes, pick: db.pick, pickDate: db.pickDate, targetDate: targetDate(), wishes: db.wishes, plans, shopping: db.shopping, staples, recent, frequent: staples, pushKey: db.vapid?.publicKey || "", pushOn: (db.push?.[NOTIFY_TO] || []).length, profiles: db.profiles, voice: !!DASHSCOPE_API_KEY, ai: !!DASHSCOPE_API_KEY, autoPickHour: AUTO_PICK_HOUR });
+      const pushOnAll: Record<string, number> = {}; for (const w of PEOPLE) pushOnAll[w] = (db.push?.[w] || []).length;
+      return json({ dishes: db.dishes, pick: db.pick, pickDate: db.pickDate, targetDate: targetDate(db), wishes: db.wishes, plans, shopping: db.shopping, staples, recent, frequent: staples, pushKey: db.vapid?.publicKey || "", pushOn: pushOnAll[NOTIFY_TO], pushOnAll, profiles: db.profiles, voice: !!DASHSCOPE_API_KEY, ai: !!DASHSCOPE_API_KEY, autoPickHour: AUTO_PICK_HOUR, ledger: db.ledger || [], inbox: (db.inbox || []).slice(-INBOX_MAX), tz: db.tz || TZ, hbUnit: HB_UNIT });
     }
 
     if (m === "POST" && path === "/api/pick") {
       const body = await req.json().catch(() => ({}));
       const type = String(body.type || "");
-      const date = DATE_RE.test(String(body.date || "")) ? String(body.date) : targetDate();
       const { db } = await loadDb();
+      const date = DATE_RE.test(String(body.date || "")) ? String(body.date) : targetDate(db);
       const pool = db.dishes.filter((d) => d.cat === "breakfast");
       if (type === "skip") db.pick = { type: "skip", dish: null, dishes: [], resolvedName: null };
       else if (type === "random") {
@@ -645,7 +770,7 @@ Deno.serve(async (req: Request) => {
         if (body.hb !== undefined) w.hb = cleanHb(body.hb) || undefined;
         if (typeof body.hbMsg === "string") w.hbMsg = cleanMsg(body.hbMsg) || undefined;
         if (!w.hb) w.hbMsg = undefined;
-        if (typeof body.hbPaid === "boolean") w.hbPaid = body.hbPaid || undefined;
+        if (typeof body.hbPaid === "boolean") { w.hbPaid = body.hbPaid || undefined; for (const l of db.ledger || []) if (l.wishId === w.id) l.paidAt = body.hbPaid ? (l.paidAt || nowIso()) : undefined; }
         // 包了红包、改了金额或那句话、红包发了 → 告诉妈妈
         if (w.hb && (w.hb !== before.hb || (w.hbMsg || "") !== before.msg)) t = queueNotify(db, w.who, { k: "hb", id: w.id });
         if (w.hbPaid && !before.paid) t = queueNotify(db, w.who, { k: "paid", id: w.id });
@@ -719,10 +844,48 @@ Deno.serve(async (req: Request) => {
       const plan = planFor(db, date);
       const ids: number[] = (Array.isArray(body.dishIds) ? body.dishIds.map(Number) : []).filter((x: number, k: number, a: number[]) => a.indexOf(x) === k && db.dishes.some((d) => d.id === x));
       const text = String(body.text || "").trim().slice(0, 60);
+      if (plan.done) return bad("这天已经做好了");
+      const before = JSON.stringify(plan.cook ? [plan.cook.dishIds, plan.cook.text] : null);
       plan.cook = ids.length || text ? { dishIds: ids, text, at: nowIso() } : null;
       syncWishes(db);
+      const t = JSON.stringify(plan.cook ? [plan.cook.dishIds, plan.cook.text] : null) !== before ? queueNotify(db, "mom", { k: "cook", date }) : null;
       await saveDb(db);
+      scheduleNotify(t);
       return json({ plan, wishes: db.wishes });
+    }
+
+    // 妈妈点「做好了」：当场结算这天的晚饭，红包进账本，告诉女儿、小陈
+    if (m === "POST" && path === "/api/dinner/done") {
+      const body = await req.json().catch(() => ({}));
+      const date = DATE_RE.test(String(body.date || "")) ? String(body.date) : "";
+      if (!date) return bad("缺日期");
+      const { db } = await loadDb();
+      const plan = db.plans[date];
+      if (!plan || !plan.cook || !plan.cook.dishIds.length) return bad("这天还没定做什么");
+      if (plan.done) return json({ plan, made: dishNames(db, plan.cook.dishIds), hb: (db.ledger || []).filter((l) => l.date === date), already: true });
+      const r = finishPlan(db, plan);
+      syncWishes(db);
+      const t = queueNotify(db, "mom", { k: "made", date });
+      await saveDb(db);
+      scheduleNotify(t);
+      return json({ plan, made: r.made.map((d) => d.name).join("＋"), hb: (db.ledger || []).filter((l) => l.date === date), home: MEMBERS.filter((w) => plan.replies[w]?.home !== false).map((w) => NAMES[w]) });
+    }
+
+    // 红包发了：账本里标成已发
+    if (m === "POST" && path === "/api/hb/paid") {
+      const body = await req.json().catch(() => ({}));
+      const who = String(body.who || "");
+      const ids: number[] = (Array.isArray(body.ids) ? body.ids.map(Number) : []);
+      const { db } = await loadDb();
+      let t: { who: string; token: number } | null = null;
+      for (const l of db.ledger || []) if (ids.includes(l.id) && !l.paidAt) {
+        l.paidAt = nowIso();
+        const w = db.wishes.find((x) => x.id === l.wishId); if (w) w.hbPaid = true;
+        if (PEOPLE.includes(who)) t = queueNotify(db, who, { k: "lpaid", id: l.id });
+      }
+      await saveDb(db);
+      scheduleNotify(t);
+      return json({ ledger: db.ledger || [] });
     }
 
     if (m === "POST" && path === "/api/shopping") {
@@ -785,7 +948,8 @@ Deno.serve(async (req: Request) => {
       if (!PEOPLE.includes(who)) return bad("不认识这个人");
       const { db } = await loadDb();
       if (!(db.push?.[who] || []).length) return bad("这台手机还没打开通知", 404);
-      const results = await pushTo(db, who, { title: "吃什么 · 通知打开了 🔔", body: "以后有人说不回来吃、点菜、选好早饭、包红包，手机会提醒你打开看", tag: "breakfast-test" });
+      const text = who === "mom" ? "以后有人说不回来吃、点菜、选好早饭、包红包，手机会提醒你打开看" : "以后晚上会提醒选早饭，早上提醒说今晚回不回来；妈妈定了做什么、做好了也会告诉你";
+      const results = await pushTo(db, who, { title: "吃什么 · 通知打开了 🔔", body: text, tag: "breakfast-test" });
       return json({ results, ok: results.some((s) => s >= 200 && s < 300) });
     }
 
