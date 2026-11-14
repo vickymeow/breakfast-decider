@@ -27,6 +27,8 @@ header p{font-size:19px;color:var(--muted);margin:2px 0 0;min-height:1.3em}
 nav{display:flex;gap:10px;position:sticky;top:env(safe-area-inset-top);background:var(--bg);z-index:5;padding:10px 0}
 nav button{flex:1;min-width:0;font-size:1.35em;font-weight:700;padding:16px 4px;border:3px solid var(--accent-deep);border-radius:18px;background:var(--paper)}
 nav button.active{background:var(--accent)}
+nav button{position:relative}
+nav .badge{position:absolute;top:-8px;right:-6px;min-width:26px;height:26px;padding:0 7px;border-radius:13px;background:var(--bad);color:#fff;font-size:16px;line-height:26px;text-align:center}
 .view{display:none;padding-top:6px}.view.active{display:block}
 .hint{font-size:21px;color:var(--muted);text-align:center;margin:6px 0 12px}
 .note{font-size:19px;color:var(--muted);text-align:center;margin:8px 0;min-height:1.3em}
@@ -182,10 +184,10 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
 
 <!-- 妈妈：今天 -->
 <section id="view-today" class="view">
-  <h2 class="sec">早饭 <small id="bfDate"></small></h2>
+  <h2 class="sec" id="bfSec">早饭 <small id="bfDate"></small></h2>
   <div id="morningCard" class="morning-card"></div>
   <button type="button" id="btnSpeak" class="big-btn">🔊 读给我听</button>
-  <h2 class="sec">晚饭 <small id="dnDate"></small></h2>
+  <h2 class="sec" id="dnSec">晚饭 <small id="dnDate"></small></h2>
   <div id="dinnerBoard" class="box"></div>
   <div id="cookCard" class="cook-card"></div>
   <div id="chooser" class="chooser" hidden></div>
@@ -377,28 +379,47 @@ function speak(text, noteEl){
 }
 
 // ---- 渲染：总入口 ----
+var renderPending=false;
+function uiBusy(){
+  var a=document.activeElement;
+  if(a&&a.tagName==='INPUT'&&a.closest('#app')) return true;   // 正在打字
+  if(recorder) return true;                                       // 正在录音
+  return false;
+}
 function render(){
+  if(uiBusy()){ renderPending=true; return; }
+  renderPending=false;
   $('dateLine').textContent=dateLabel(today()).replace('今天 ','');
   renderMorning(); renderDinner(); renderOrder(); renderBreakfast(); renderShop(); renderRecipes();
+  updateNavBadge();
 }
+document.addEventListener('focusout', function(){ setTimeout(function(){ if(renderPending&&!uiBusy()) render(); }, 150); });
 
 // 早饭答案（妈妈的今天页 + 女儿早饭页顶部）
 var speakText='';
 function morningHtml(){
   var cur=pickIsCurrent()?state.pick:null, name, sub, body;
-  if(cur&&cur.type==='skip'){ name='不吃'; sub='不用做'; body='<div class="pics"><div class="pic"><span class="emoji">😴</span></div></div>'; speakText='早饭不吃，不用做'; }
+  var when = targetDate()===today() ? '今天早饭' : '明天早饭';
+  if(cur&&cur.type==='skip'){ name='不吃'; sub='不用做'; body='<div class="pics"><div class="pic"><span class="emoji">😴</span></div></div>'; speakText=when+'不吃，不用做'; }
   else if(cur){
     var ds=pickedIds(cur).map(dishById).filter(Boolean);
     name=cur.resolvedName||ds.map(function(d){ return d.name; }).join('＋');
     sub=cur.auto?'没人选，早上 '+(state.autoPickHour||6)+' 点自动随机的':cur.type==='random'?'随便选的，就它了':(ds.length>1?'女儿选的，这几样一起':'女儿选的');
     body='<div class="pics'+(ds.length>1?' multi':'')+'">'+(ds.length?ds.map(function(d){ return picHtml(d, ds.length>1); }).join(''):'<div class="pic"><span class="emoji">🍽️</span></div>')+'</div>';
     var ns=ds.length?ds.map(function(d){ return d.name; }):[name];
-    speakText='早饭是'+(ns.length>1?ns.slice(0,-1).join('、')+'和'+ns[ns.length-1]:ns[0]);
-  } else { name=FALLBACK_NAME; sub=loaded?'没选，就做这个':'正在连接…'; body='<div class="pics"><div class="pic"><span class="emoji">'+FALLBACK_EMOJI+'</span></div></div>'; speakText='早饭是'+FALLBACK_NAME; }
+    speakText=when+'是'+(ns.length>1?ns.slice(0,-1).join('、')+'和'+ns[ns.length-1]:ns[0]);
+  } else { name=FALLBACK_NAME; sub=loaded?'没选，就做这个':'正在连接…'; body='<div class="pics"><div class="pic"><span class="emoji">'+FALLBACK_EMOJI+'</span></div></div>'; speakText=when+'是'+FALLBACK_NAME; }
   return { html: body+'<div class="name">'+esc(name)+'</div>'+(sub?'<div class="sub">'+esc(sub)+'</div>':''), name:name };
 }
 function renderMorning(){
   var m=morningHtml(); $('morningCard').innerHTML=m.html; $('bfDate').textContent=dateLabel(targetDate());
+  // 下午 1 点以后，妈妈关心的是晚饭：晚饭那块挪到上面
+  var sec=$('view-today'), first=sec.firstElementChild, dinnerFirst=new Date().getHours()>=13;
+  var isDinnerFirst = first && first.id==='dnSec';
+  if(dinnerFirst!==isDinnerFirst){
+    var bf=[$('bfSec'),$('morningCard'),$('btnSpeak')], dn=[$('dnSec'),$('dinnerBoard'),$('cookCard'),$('chooser'),$('btnSpeakDinner')];
+    (dinnerFirst?dn.concat(bf):bf.concat(dn)).forEach(function(el){ sec.appendChild(el); });
+  }
 }
 
 // 晚饭（妈妈的今天页）
@@ -428,9 +449,12 @@ function renderDinner(){
   $('cookCard').innerHTML='<div class="lab">'+(isToday?'今晚做':'明晚做')+'</div>'
     +'<div class="txt'+(cn?'':' none')+'">'+(cn?esc(cn):'还没定')+'</div>'
     +(forWho.length?'<div class="for">'+esc(forWho.join('和'))+'想吃的 ✓</div>':'')
+    +(function(){ if(!plan||!plan.cook) return ''; var ds=(plan.cook.dishIds||[]).map(dishById).filter(Boolean); var miss=[]; var noIng=[]; ds.forEach(function(d){ if(!(d.ingredients||[]).length) noIng.push(d.name); (d.ingredients||[]).forEach(function(x){ if(!openItem(x)&&miss.indexOf(x)<0) miss.push(x); }); });
+        if(!miss.length&&!noIng.length) return '';
+        return '<div class="tmr" style="text-align:left"><b>材料</b>'+(miss.length?'：'+esc(miss.join('、'))+' <button type="button" class="big-btn ghost" data-goshop="1" style="width:auto;display:inline-block;padding:8px 14px;font-size:19px">去买菜页点一下</button>':'')+(noIng.length?'<div class="note" style="text-align:left;margin:6px 0 0">'+esc(noIng.join('、'))+' 还没填食材</div>':'')+'</div>'; })()
     +'<button type="button" class="big-btn'+(cn?' ghost':' primary')+'" data-day="today" style="width:100%">'+(cn?'换一个':'定'+(isToday?'今晚':'明晚')+'做什么')+'</button>'
     +'<div class="tmr">'+(isToday?'明晚':'后天')+'：'+(cn2?'<b>'+esc(cn2)+'</b> ':'还没定 ')+'<button type="button" class="big-btn ghost" data-day="tomorrow" style="width:auto;display:inline-block;padding:8px 14px;font-size:19px">'+(cn2?'改':'也定一下')+'</button></div>';
-  Array.prototype.forEach.call($('cookCard').querySelectorAll('button'), function(b){ b.onclick=function(){ openChooser(b.getAttribute('data-day')); }; });
+  Array.prototype.forEach.call($('cookCard').querySelectorAll('button'), function(b){ b.onclick=function(){ if(b.getAttribute('data-goshop')){ showView('shop'); window.scrollTo(0,0); return; } openChooser(b.getAttribute('data-day')); }; });
   dinnerSpeak=(isToday?'今晚':'明晚')+n+'个人回来吃。'+lines.join('。')+'。'+(cn?(isToday?'今晚做':'明晚做')+cn.replace(/＋/g,'和'):'还没定做什么');
   renderChooser();
 }
@@ -587,11 +611,7 @@ var clearArmed=false;
 $('btnClearDone').onclick=function(){
   if(!clearArmed){ clearArmed=true; renderShop(); setTimeout(function(){ if(clearArmed){ clearArmed=false; renderShop(); } },4000); return; }
   clearArmed=false;
-  // 没打钩的先全部打钩（算买到了），再把打钩的清掉
-  var open=(state.shopping||[]).filter(function(x){ return !x.done; });
-  var p=Promise.resolve();
-  open.forEach(function(it){ p=p.then(function(){ return api('/api/shopping',{method:'POST',json:{op:'toggle',id:it.id}}); }); });
-  act(p.then(function(){ return api('/api/shopping',{method:'POST',json:{op:'clear_done'}}); }),'买菜篮清空了');
+  act(api('/api/shopping',{method:'POST',json:{op:'ordered'}}),'买菜篮清空了');
 };
 
 // 菜谱（全家）
@@ -676,8 +696,13 @@ function showView(v){
 }
 function buildNav(){
   var nav=$('nav'), views=NAV[role]||VIEWS;
-  nav.innerHTML=views.map(function(v){ return '<button type="button" data-view="'+v+'">'+VIEW_NAMES[v]+'</button>'; }).join('');
+  nav.innerHTML=views.map(function(v){ return '<button type="button" data-view="'+v+'">'+VIEW_NAMES[v]+'<span class="badge" hidden></span></button>'; }).join('');
   Array.prototype.forEach.call(nav.querySelectorAll('button'), function(b){ b.onclick=function(){ showView(b.getAttribute('data-view')); }; });
+}
+function updateNavBadge(){
+  var b=document.querySelector('#nav button[data-view="shop"] .badge'); if(!b) return;
+  var n=(state.shopping||[]).filter(function(x){ return !x.done; }).length;
+  b.hidden=!n; b.textContent=n;
 }
 function applyRole(r){
   role=r; document.body.classList.toggle('mom', r==='mom');

@@ -13,7 +13,7 @@
 //   POST /api/wishes/:id/remove
 //   POST /api/dinner/reply {who, home, date}          回不回来吃
 //   POST /api/dinner/cook  {date, dishIds, text}      妈妈定今晚/明晚做什么（空 = 取消）
-//   POST /api/shopping    {op:"add", names:[], from?} | {op:"toggle"|"remove", id} | {op:"clear_done"}   买菜清单（全家共用）
+//   POST /api/shopping    {op:"add", names:[], from?} | {op:"toggle"|"remove", id} | {op:"clear_done"} | {op:"ordered"}   买菜清单（全家共用）
 //   POST /api/transcribe  （请求体是录音）           Qwen 语音转文字
 //   POST /api/ingredients {name}                      Qwen 给出食材清单
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -40,7 +40,8 @@ const QWEN_ASR_MODEL = Deno.env.get("QWEN_ASR_MODEL") || "qwen3-asr-flash";
 // 语音模型候选：Token Plan 套餐里叫 qwen-audio-3.0-asr-flash，按量付费叫 qwen3-asr-flash；哪个能用记住哪个
 const ASR_CANDIDATES = [QWEN_ASR_MODEL, "qwen-audio-3.0-asr-flash", "qwen3-asr-flash"].filter((x, i, a) => a.indexOf(x) === i);
 let workingAsrModel: string | null = null;
-const QWEN_CHAT_MODEL = Deno.env.get("QWEN_CHAT_MODEL") || "qwen-flash";
+// 套餐里没有 qwen-flash，默认直接用套餐里的 qwen3.8-flash，省一次白跑
+const QWEN_CHAT_MODEL = Deno.env.get("QWEN_CHAT_MODEL") || (IS_TOKEN_PLAN ? "qwen3.8-flash" : "qwen-flash");
 // 对话模型候选：配置的优先，其余按便宜到贵排；套餐里没有的（404 model_not_found）自动跳过，记住能用的
 const CHAT_CANDIDATES = [QWEN_CHAT_MODEL, "qwen3.8-flash", "qwen3.6-flash", "qwen3.7-plus", "qwen3.6-plus", "qwen-flash", "qwen-turbo", "qwen-plus", "qwen3.8-max", "qwen3.7-max", "qwen3-max", "qwen-max"].filter((x, i, a) => a.indexOf(x) === i);
 let workingChatModel: string | null = null;
@@ -528,6 +529,9 @@ Deno.serve(async (req: Request) => {
         else { it.done = !it.done; it.doneAt = it.done ? nowIso() : undefined; }
       } else if (op === "clear_done") {
         db.shopping = db.shopping.filter((x) => !x.done);
+      } else if (op === "ordered") {
+        // 已下单：全部算买到并清空（常买记录在加入时已记过）
+        db.shopping = [];
       } else return bad("不认识的操作");
       await saveDb(db);
       return json({ shopping: db.shopping });
