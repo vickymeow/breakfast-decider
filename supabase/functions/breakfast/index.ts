@@ -40,8 +40,8 @@ const DASHSCOPE_API_KEY = (Deno.env.get("DASHSCOPE_API_KEY") || "").trim();
 const IS_TOKEN_PLAN = DASHSCOPE_API_KEY.startsWith("sk-sp-");
 const DEFAULT_BASE = IS_TOKEN_PLAN ? "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1" : "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
 const DASHSCOPE_BASE_URL = (Deno.env.get("DASHSCOPE_BASE_URL") || DEFAULT_BASE).replace(/\/+$/, "");
-const QWEN_ASR_MODEL = Deno.env.get("QWEN_ASR_MODEL") || "qwen3-asr-flash";
-// 语音模型候选：Token Plan 套餐里叫 qwen-audio-3.0-asr-flash，按量付费叫 qwen3-asr-flash；哪个能用记住哪个
+// 语音模型：Token Plan 套餐里叫 qwen-audio-3.0-asr-flash，按量付费叫 qwen3-asr-flash；哪个能用记住哪个
+const QWEN_ASR_MODEL = Deno.env.get("QWEN_ASR_MODEL") || (IS_TOKEN_PLAN ? "qwen-audio-3.0-asr-flash" : "qwen3-asr-flash");
 const ASR_CANDIDATES = [QWEN_ASR_MODEL, "qwen-audio-3.0-asr-flash", "qwen3-asr-flash"].filter((x, i, a) => a.indexOf(x) === i);
 let workingAsrModel: string | null = null;
 // 套餐里没有 qwen-flash，默认直接用套餐里的 qwen3.8-flash，省一次白跑
@@ -51,6 +51,8 @@ const CHAT_CANDIDATES = [QWEN_CHAT_MODEL, "qwen3.8-flash", "qwen3.6-flash", "qwe
 let workingChatModel: string | null = null;
 // 语音识别可以单独用另一把 key / 地址（套餐若不含 ASR 模型时用按量付费的普通 key）
 const ASR_API_KEY = (Deno.env.get("QWEN_ASR_API_KEY") || DASHSCOPE_API_KEY).trim();
+// 没听到人声时抛这个，接口回 422，网页提示「没听清」
+class NoSpeech extends Error {}
 const ASR_BASE_URL = (Deno.env.get("QWEN_ASR_BASE_URL") || (ASR_API_KEY.startsWith("sk-sp-") ? "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1" : (Deno.env.get("QWEN_ASR_API_KEY") ? "https://dashscope-intl.aliyuncs.com/compatible-mode/v1" : DASHSCOPE_BASE_URL))).replace(/\/+$/, "");
 
 type Cat = "breakfast" | "dinner";
@@ -216,16 +218,44 @@ function asrBodies(model: string, b64: string, contentType: string, fmt: string)
     { name: "plain+text", body: { model, stream: false, messages: [{ role: "user", content: [{ type: "input_audio", input_audio: { data: dataUrl, format: fmt } }, { type: "text", text: "请把这段话转成文字。" }] }] } },
   ];
 }
+// 语音识别。实测（2026-11）：qwen-audio-3.0-asr-flash 不走 OpenAI 兼容的对话接口，要走百炼原生的
+//   POST {host}/api/v1/services/aigc/multimodal-generation/generation
+//   {model, input:{messages:[{role:"user",content:[{audio:"data:audio/wav;base64,..."}]}]}, parameters:{format, sample_rate}}
+// parameters.format 必填（少了就回空的 400）；返回 {text, sentence}；录音里没有人声也是回 400。
+async function asrNative(model: string, b64: string, contentType: string, fmt: string): Promise<{ ok: boolean; status: number; text: string; raw: string }> {
+  const url = new URL(ASR_BASE_URL).origin + "/api/v1/services/aigc/multimodal-generation/generation";
+  const body = { model, input: { messages: [{ role: "user", content: [{ audio: `data:${contentType};base64,${b64}` }] }] }, parameters: { format: fmt, sample_rate: 16000, language_hints: ["zh"] } };
+  const r = await fetch(url, { method: "POST", headers: { authorization: `Bearer ${ASR_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+  const raw = await r.text();
+  let text = "";
+  try { const j = JSON.parse(raw); text = String(j.text || j.sentence?.text || j.output?.text || j.output?.sentence?.text || "").trim(); } catch { /* 不是 JSON */ }
+  return { ok: r.ok, status: r.status, text, raw };
+}
 async function qwenTranscribe(bytes: Uint8Array, contentType: string): Promise<string> {
-  const fmt = contentType.includes("webm") ? "webm" : contentType.includes("ogg") ? "ogg" : contentType.includes("wav") ? "wav" : contentType.includes("mpeg") ? "mp3" : contentType.includes("aac") ? "aac" : "mp4";
+  const fmt = contentType.includes("wav") ? "wav" : contentType.includes("webm") ? "webm" : contentType.includes("ogg") ? "ogg" : contentType.includes("mpeg") ? "mp3" : contentType.includes("aac") ? "aac" : "mp4";
   const b64 = toB64(bytes);
   const models = workingAsrModel ? [workingAsrModel, ...ASR_CANDIDATES.filter((m) => m !== workingAsrModel)] : ASR_CANDIDATES;
   let lastErr = "";
+  // 1) 百炼原生接口（套餐走这条）
   for (const model of models) {
-    if (workingAsrVariant === 99) break; // 上次是转写接口通的，跳过对话式
+    const r = await asrNative(model, b64, contentType, fmt);
+    if (r.ok) {
+      workingAsrModel = model; workingAsrVariant = 100;
+      console.log("qwen asr ok (native)", model, contentType, bytes.length, r.text.length);
+      if (!r.text) throw new NoSpeech("empty text");
+      return r.text;
+    }
+    lastErr = `${model} native ${contentType} ${bytes.length}B: ${r.status} ${r.raw.slice(0, 200)}`;
+    console.error("qwen asr failed", lastErr);
+    if (r.status === 401 || r.status === 403) throw new Error("asr: " + lastErr);
+    if (r.status === 404) continue;                       // 这把 key 没有这个模型，换下一个
+    if (r.status === 400 && !/url error/i.test(r.raw)) throw new NoSpeech(lastErr); // 接口通了但没识别出内容：没人声 / 录音读不了
+  }
+  // 2) 按量付费的 key：OpenAI 兼容的对话接口（qwen3-asr-flash）
+  if (ASR_API_KEY.startsWith("sk-sp-")) throw new Error("asr: " + lastErr);
+  for (const model of models) {
     const variants = asrBodies(model, b64, contentType, fmt);
-    const order = workingAsrVariant >= 0 ? [workingAsrVariant, ...variants.map((_, i) => i).filter((i) => i !== workingAsrVariant)] : variants.map((_, i) => i);
-    let modelMissing = false;
+    const order = workingAsrVariant >= 0 && workingAsrVariant < variants.length ? [workingAsrVariant, ...variants.map((_, i) => i).filter((i) => i !== workingAsrVariant)] : variants.map((_, i) => i);
     for (const vi of order) {
       const v = variants[vi];
       const r = await fetch(`${ASR_BASE_URL}/chat/completions`, { method: "POST", headers: { authorization: `Bearer ${ASR_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify(v.body) });
@@ -239,26 +269,8 @@ async function qwenTranscribe(bytes: Uint8Array, contentType: string): Promise<s
       lastErr = `${model} ${v.name} ${contentType} ${bytes.length}B: ${r.status} ${txt.slice(0, 300)}`;
       console.error("qwen asr failed", lastErr);
       if (r.status === 401 || r.status === 403) throw new Error("asr: " + lastErr);
-      if (r.status === 404 && txt.includes("model_not_found")) { modelMissing = true; break; }
+      if (r.status === 404 && txt.includes("model_not_found")) break;
     }
-    if (modelMissing) continue;
-  }
-  // 对话式都不行：再试 OpenAI 风格的录音转写接口（上传文件）
-  for (const model of models) {
-    const form = new FormData();
-    form.append("file", new Blob([bytes], { type: contentType }), `voice.${fmt === "mp4" ? "m4a" : fmt}`);
-    form.append("model", model);
-    form.append("language", "zh");
-    const r = await fetch(`${ASR_BASE_URL}/audio/transcriptions`, { method: "POST", headers: { authorization: `Bearer ${ASR_API_KEY}` }, body: form });
-    const txt = await r.text();
-    if (r.ok) {
-      workingAsrModel = model; workingAsrVariant = 99;
-      console.log("qwen asr ok (transcriptions)", model, contentType, bytes.length);
-      try { const j = JSON.parse(txt); return String(j.text || j.result?.text || "").trim(); } catch { return txt.trim(); }
-    }
-    lastErr = `${model} transcriptions ${contentType} ${bytes.length}B: ${r.status} ${txt.slice(0, 300)}`;
-    console.error("qwen asr failed", lastErr);
-    if (r.status === 401 || r.status === 403) break;
   }
   throw new Error("asr: " + lastErr);
 }
@@ -639,7 +651,7 @@ Deno.serve(async (req: Request) => {
       if (bytes.length < 500) return bad("没录到声音");
       if (bytes.length > 6 * 1024 * 1024) return bad("录音太长了");
       try { return json({ text: await qwenTranscribe(bytes, ct) }); }
-      catch { return bad("语音识别服务出错了，请再试一次", 502); }
+      catch (e) { return e instanceof NoSpeech ? bad("没听清，请靠近手机再说一次", 422) : bad("语音识别服务出错了，请再试一次", 502); }
     }
 
     if (m === "POST" && path === "/api/ingredients") {
