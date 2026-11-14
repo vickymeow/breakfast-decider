@@ -14,6 +14,9 @@
 //   POST /api/dinner/reply {who, home, date}          回不回来吃
 //   POST /api/dinner/cook  {date, dishIds, text}      妈妈定今晚/明晚做什么（空 = 取消）
 //   POST /api/shopping    {op:"add", names:[], from?} | {op:"toggle"|"remove", id} | {op:"clear_done"}   买菜清单（全家共用）
+//   POST /api/orders      {by}                        「选好了，下单吧」：把清单里没打钩的打包成一张单子
+//   GET  /api/orders?status=pending                   给 Mac 上的下单助手查新单子
+//   POST /api/orders/:id/status {status, note}        pending → cart（已加入购物车）→ done（已下单）| cancelled
 //   POST /api/transcribe  （请求体是录音）           Qwen 语音转文字
 //   POST /api/ingredients {name}                      Qwen 给出食材清单
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -58,7 +61,9 @@ type Reply = { home: boolean | null; at: string };
 type Plan = { date: string; replies: Record<string, Reply>; cook: { dishIds: number[]; text: string; at: string } | null; done?: boolean };
 type Wish = { id: number; dishId: number; who: string; at: string; status: "open" | "planned" | "done"; plannedFor?: string; doneAt?: string };
 type ShopItem = { id: number; name: string; done: boolean; from?: string; at: string; doneAt?: string };
-type Db = { v: number; dishes: Dish[]; pick: Pick | null; pickDate: string | null; plans: Record<string, Plan>; wishes: Wish[]; shopping: ShopItem[]; shopHistory: Record<string, number> };
+type OrderStatus = "pending" | "cart" | "done" | "cancelled";
+type Order = { id: number; items: string[]; itemIds: number[]; by: string; at: string; status: OrderStatus; note?: string; updatedAt: string };
+type Db = { v: number; dishes: Dish[]; pick: Pick | null; pickDate: string | null; plans: Record<string, Plan>; wishes: Wish[]; shopping: ShopItem[]; shopHistory: Record<string, number>; orders: Order[] };
 const MEMBERS = ["kid", "jim"];
 
 const SEED_NAMES: [string, string][] = [["乌冬面","🍜"],["炒荞麦面","🍝"],["馄饨","🥟"],["蒸饺","🥟"],["煎饺","🥟"],["炒饭","🍚"],["吐司","🍞"],["鸡蛋","🥚"]];
@@ -75,7 +80,7 @@ const addDays = (date: string, n: number) => { const d = new Date(date + "T00:00
 
 // ---- 数据读写与迁移 ----
 function fresh(): Db {
-  return { v: 2, dishes: SEED_NAMES.map(([name, emoji], i) => ({ id: i + 1, name, emoji, cat: "breakfast", mom: true, ingredients: [], lastMade: null, times: 0 })), pick: null, pickDate: null, plans: {}, wishes: [], shopping: [], shopHistory: {} };
+  return { v: 2, dishes: SEED_NAMES.map(([name, emoji], i) => ({ id: i + 1, name, emoji, cat: "breakfast", mom: true, ingredients: [], lastMade: null, times: 0 })), pick: null, pickDate: null, plans: {}, wishes: [], shopping: [], shopHistory: {}, orders: [] };
 }
 // 旧结构（v1：dishes 只有早饭；dinner 一份含 wish 文本）升到 v2
 // deno-lint-ignore no-explicit-any
@@ -84,6 +89,7 @@ function migrate(raw: any): { db: Db; changed: boolean } {
     const db = raw as Db; let changed = false;
     if (!Array.isArray(db.shopping)) { db.shopping = []; changed = true; }
     if (!db.shopHistory || typeof db.shopHistory !== "object") { db.shopHistory = {}; changed = true; }
+    if (!Array.isArray(db.orders)) { db.orders = []; changed = true; }
     return { db, changed };
   }
   const db: Db = fresh();
@@ -350,7 +356,8 @@ Deno.serve(async (req: Request) => {
       if (changed) await saveDb(db);
       const plans = DATE_RE.test(dDate) ? { today: db.plans[dDate], tomorrow: db.plans[addDays(dDate, 1)] || { date: addDays(dDate, 1), replies: {}, cook: null } } : {};
       const frequent = Object.entries(db.shopHistory).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([n]) => n);
-      return json({ dishes: db.dishes, pick: db.pick, pickDate: db.pickDate, targetDate: targetDate(), wishes: db.wishes, plans, shopping: db.shopping, frequent, voice: !!DASHSCOPE_API_KEY, ai: !!DASHSCOPE_API_KEY, autoPickHour: AUTO_PICK_HOUR });
+      const order = db.orders.filter((o) => o.status === "pending" || o.status === "cart").sort((a, b) => (a.at < b.at ? 1 : -1))[0] || null;
+      return json({ dishes: db.dishes, pick: db.pick, pickDate: db.pickDate, targetDate: targetDate(), wishes: db.wishes, plans, shopping: db.shopping, frequent, order, voice: !!DASHSCOPE_API_KEY, ai: !!DASHSCOPE_API_KEY, autoPickHour: AUTO_PICK_HOUR });
     }
 
     if (m === "POST" && path === "/api/pick") {
@@ -531,6 +538,41 @@ Deno.serve(async (req: Request) => {
       } else return bad("不认识的操作");
       await saveDb(db);
       return json({ shopping: db.shopping });
+    }
+
+    // ---- 下单 ----
+    if (m === "POST" && path === "/api/orders") {
+      const body = await req.json().catch(() => ({}));
+      const { db } = await loadDb();
+      const open = db.shopping.filter((it) => !it.done);
+      if (!open.length) return bad("清单里没有要买的东西");
+      // 已有待处理的单子就更新它，不重复开单
+      let order = db.orders.find((o) => o.status === "pending");
+      if (order) { order.items = open.map((it) => it.name); order.itemIds = open.map((it) => it.id); order.updatedAt = nowIso(); }
+      else { order = { id: Date.now(), items: open.map((it) => it.name), itemIds: open.map((it) => it.id), by: String(body.by || ""), at: nowIso(), status: "pending", updatedAt: nowIso() }; db.orders.push(order); }
+      db.orders = db.orders.slice(-20);
+      await saveDb(db);
+      return json({ order });
+    }
+    if (m === "GET" && path === "/api/orders") {
+      const { db } = await loadDb();
+      const st = url.searchParams.get("status");
+      return json({ orders: db.orders.filter((o) => !st || o.status === st).sort((a, b) => (a.at < b.at ? 1 : -1)) });
+    }
+    const orderRoute = path.match(/^\/api\/orders\/(\d+)\/status$/);
+    if (orderRoute && m === "POST") {
+      const body = await req.json().catch(() => ({}));
+      const status = String(body.status || "") as OrderStatus;
+      if (!["pending", "cart", "done", "cancelled"].includes(status)) return bad("不认识的状态");
+      const { db } = await loadDb();
+      const order = db.orders.find((o) => o.id === Number(orderRoute[1]));
+      if (!order) return bad("找不到这张单子", 404);
+      order.status = status; order.updatedAt = nowIso();
+      if (typeof body.note === "string") order.note = body.note.slice(0, 200);
+      // 下单完成：清单里对应的东西自动打钩
+      if (status === "done") for (const it of db.shopping) if (order.itemIds.includes(it.id) && !it.done) { it.done = true; it.doneAt = nowIso(); }
+      await saveDb(db);
+      return json({ order });
     }
 
     if (m === "POST" && path === "/api/transcribe") {

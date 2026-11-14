@@ -139,6 +139,9 @@ h3.sec{font-size:22px;color:var(--muted);margin:18px 0 8px}
 .plan-dish:first-of-type{border-top:none;padding-top:0}
 .plan-dish .t{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:24px;font-weight:800}
 .plan-dish .t button{margin-left:auto;font-size:19px;padding:8px 12px;border-radius:12px;border:2px solid var(--accent-deep);background:var(--paper);flex-shrink:0}
+.order-st{display:inline-block;padding:4px 12px;border-radius:999px;font-size:19px;font-weight:700;border:2px solid var(--line);background:var(--bg)}
+.order-st.pending{background:var(--pick-soft);border-color:var(--pick);color:#8a4b00}
+.order-st.cart{background:var(--good-soft);border-color:#2e7d32;color:#1b5e20}
 .shop-row{display:flex;align-items:stretch;gap:8px;margin-bottom:8px}
 .shop-row .shop-item{margin:0;flex:1;min-width:0}
 .shop-row .store{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 14px;border-radius:18px;border:3px solid #2e7d32;background:var(--good-soft);color:#1b5e20;font-size:20px;font-weight:800;text-decoration:none;white-space:nowrap}
@@ -231,7 +234,9 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
   </form>
   <p id="shopStatus" class="note"></p>
   <div class="chips" id="frequentChips" style="margin-bottom:12px"></div>
+  <div id="orderBox" class="box" hidden></div>
   <div id="shopList"></div>
+  <button type="button" id="btnOrder" class="big-btn primary" style="width:100%;margin-bottom:10px" hidden>🛒 选好了，下单吧</button>
   <button type="button" id="btnClearDone" class="big-btn ghost" style="width:100%" hidden>清空已买的</button>
   <h2 class="sec" id="shopSecTitle" hidden>按菜加 <small>点一道菜，再点它的食材</small></h2>
   <div class="chips" id="dishChips"></div>
@@ -578,7 +583,23 @@ function renderShop(){
   $('shopList').innerHTML=(open.length||done.length)?open.map(row).join('')+(done.length?'<h3 class="sec">买到了</h3>'+done.map(row).join(''):''):(loaded?'<p class="note">清单是空的。按 🎤 说一句要买什么就行'+(simple?'':'，或者在下面点一道菜加它的食材')+'</p>':'');
   Array.prototype.forEach.call($('shopList').querySelectorAll('.shop-item'), function(b){ b.onclick=function(){ act(api('/api/shopping',{method:'POST',json:{op:'toggle',id:Number(b.getAttribute('data-id'))}})); }; });
   $('btnClearDone').hidden=!done.length;
+  // 下单
+  var od=state.order||null, ob=$('orderBox');
+  $('btnOrder').hidden=!(loaded&&open.length&&!(od&&od.status==='pending'));
+  if(!od){ ob.hidden=true; }
+  else {
+    ob.hidden=false;
+    var stText=od.status==='pending'?'已交给小帮手，等它加进 Weee 购物车':'已加入 Weee 购物车，去付款就行';
+    var when=new Date(od.updatedAt||od.at); var hhmm=pad(when.getHours())+':'+pad(when.getMinutes());
+    ob.innerHTML='<h3>这张单子 <span class="order-st '+od.status+'">'+(od.status==='pending'?'待处理':'已加购物车')+'</span></h3>'
+      +'<div style="font-size:22px;line-height:1.5">'+od.items.map(esc).join('、')+'</div>'
+      +'<p class="note" style="text-align:left;margin:8px 0">'+stText+' · '+hhmm+(od.note?' · '+esc(od.note):'')+'</p>'
+      +'<div class="row">'+(od.status==='cart'&&store&&store.cart?'<a class="big-btn primary" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center" href="'+esc(store.cart)+'" target="_blank" rel="noopener">去 Weee 付款</a>':'')
+      +'<button type="button" class="big-btn" data-ost="done">已经下单了</button><button type="button" class="big-btn ghost" data-ost="cancelled">取消</button></div>';
+    Array.prototype.forEach.call(ob.querySelectorAll('[data-ost]'), function(b){ b.onclick=function(){ var st=b.getAttribute('data-ost'); act(api('/api/orders/'+od.id+'/status',{method:'POST',json:{status:st}}), st==='done'?'记下了，清单里的都打钩了':'取消了'); }; });
+  }
 }
+$('btnOrder').onclick=function(){ act(api('/api/orders',{method:'POST',json:{by:role}}),'单子交出去了'); };
 $('shopForm').onsubmit=function(e){ e.preventDefault(); var add=parseList($('shopInput').value); if(!add.length) return; shopAdd(add).then(function(){ $('shopInput').value=''; }); };
 $('btnShopVoice').onclick=function(){ voiceCapture({btn:$('btnShopVoice'),status:$('shopStatus'),input:$('shopInput'),onText:function(t){ var add=parseList(t); if(!add.length){ $('shopStatus').textContent='没听清，请再说一次'; return; } shopAdd(add); }}); };
 $('btnClearDone').onclick=function(){ act(api('/api/shopping',{method:'POST',json:{op:'clear_done'}}),'清掉了'); };
