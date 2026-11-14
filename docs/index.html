@@ -232,7 +232,7 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
   <p id="shopStatus" class="note"></p>
   <div class="chips" id="frequentChips" style="margin-bottom:12px"></div>
   <div id="shopList"></div>
-  <button type="button" id="btnClearDone" class="big-btn ghost" style="width:100%" hidden>清空已买的</button>
+  <button type="button" id="btnClearDone" class="big-btn primary" style="width:100%" hidden>✅ 已下单，清空买菜篮</button>
   <h2 class="sec" id="shopSecTitle" hidden>按菜加 <small>点一道菜，再点它的食材</small></h2>
   <div class="chips" id="dishChips"></div>
   <div id="planBox" class="box" hidden style="margin-top:10px"></div>
@@ -577,11 +577,22 @@ function renderShop(){
   }
   $('shopList').innerHTML=(open.length||done.length)?open.map(row).join('')+(done.length?'<h3 class="sec">买到了</h3>'+done.map(row).join(''):''):(loaded?'<p class="note">清单是空的。按 🎤 说一句要买什么就行'+(simple?'':'，或者在下面点一道菜加它的食材')+'</p>':'');
   Array.prototype.forEach.call($('shopList').querySelectorAll('.shop-item'), function(b){ b.onclick=function(){ act(api('/api/shopping',{method:'POST',json:{op:'toggle',id:Number(b.getAttribute('data-id'))}})); }; });
-  $('btnClearDone').hidden=!done.length;
+  $('btnClearDone').hidden=!(open.length||done.length);
+  $('btnClearDone').textContent = clearArmed ? '确定清空？再点一下' : '✅ 已下单，清空买菜篮';
+  $('btnClearDone').classList.toggle('danger', clearArmed);
 }
 $('shopForm').onsubmit=function(e){ e.preventDefault(); var add=parseList($('shopInput').value); if(!add.length) return; shopAdd(add).then(function(){ $('shopInput').value=''; }); };
 $('btnShopVoice').onclick=function(){ voiceCapture({btn:$('btnShopVoice'),status:$('shopStatus'),input:$('shopInput'),onText:function(t){ var add=parseList(t); if(!add.length){ $('shopStatus').textContent='没听清，请再说一次'; return; } shopAdd(add); }}); };
-$('btnClearDone').onclick=function(){ act(api('/api/shopping',{method:'POST',json:{op:'clear_done'}}),'清掉了'); };
+var clearArmed=false;
+$('btnClearDone').onclick=function(){
+  if(!clearArmed){ clearArmed=true; renderShop(); setTimeout(function(){ if(clearArmed){ clearArmed=false; renderShop(); } },4000); return; }
+  clearArmed=false;
+  // 没打钩的先全部打钩（算买到了），再把打钩的清掉
+  var open=(state.shopping||[]).filter(function(x){ return !x.done; });
+  var p=Promise.resolve();
+  open.forEach(function(it){ p=p.then(function(){ return api('/api/shopping',{method:'POST',json:{op:'toggle',id:it.id}}); }); });
+  act(p.then(function(){ return api('/api/shopping',{method:'POST',json:{op:'clear_done'}}); }),'买菜篮清空了');
+};
 
 // 菜谱（全家）
 function dishRow(d, i, n){
