@@ -38,6 +38,9 @@ const DEFAULT_BASE = IS_TOKEN_PLAN ? "https://token-plan.ap-southeast-1.maas.ali
 const DASHSCOPE_BASE_URL = (Deno.env.get("DASHSCOPE_BASE_URL") || DEFAULT_BASE).replace(/\/+$/, "");
 const QWEN_ASR_MODEL = Deno.env.get("QWEN_ASR_MODEL") || "qwen3-asr-flash";
 const QWEN_CHAT_MODEL = Deno.env.get("QWEN_CHAT_MODEL") || "qwen-flash";
+// 对话模型候选：配置的优先，其余按便宜到贵排；套餐里没有的（404 model_not_found）自动跳过，记住能用的
+const CHAT_CANDIDATES = [QWEN_CHAT_MODEL, "qwen-flash", "qwen-turbo", "qwen-plus", "qwen3-max", "qwen-max", "qwen3-coder-flash", "qwen3-coder-plus"].filter((x, i, a) => a.indexOf(x) === i);
+let workingChatModel: string | null = null;
 // 语音识别可以单独用另一把 key / 地址（套餐若不含 ASR 模型时用按量付费的普通 key）
 const ASR_API_KEY = (Deno.env.get("QWEN_ASR_API_KEY") || DASHSCOPE_API_KEY).trim();
 const ASR_BASE_URL = (Deno.env.get("QWEN_ASR_BASE_URL") || (ASR_API_KEY.startsWith("sk-sp-") ? "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1" : (Deno.env.get("QWEN_ASR_API_KEY") ? "https://dashscope-intl.aliyuncs.com/compatible-mode/v1" : DASHSCOPE_BASE_URL))).replace(/\/+$/, "");
@@ -193,19 +196,30 @@ async function qwenTranscribe(bytes: Uint8Array, contentType: string): Promise<s
   const c = out?.choices?.[0]?.message?.content;
   return (Array.isArray(c) ? c.map((x: { text?: string }) => x.text || "").join("") : String(c || "")).trim();
 }
+async function qwenChat(messages: unknown[], extra: Record<string, unknown> = {}): Promise<string> {
+  const order = workingChatModel ? [workingChatModel, ...CHAT_CANDIDATES.filter((m) => m !== workingChatModel)] : CHAT_CANDIDATES;
+  let lastErr = "";
+  for (const model of order) {
+    const body = { model, stream: false, enable_thinking: false, temperature: 0.2, messages, ...extra };
+    const r = await fetch(`${DASHSCOPE_BASE_URL}/chat/completions`, { method: "POST", headers: { authorization: `Bearer ${DASHSCOPE_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+    const txt = await r.text();
+    if (r.ok) { workingChatModel = model; return String(JSON.parse(txt)?.choices?.[0]?.message?.content || ""); }
+    lastErr = `${model}: ${r.status} ${txt.slice(0, 200)}`;
+    // 模型不在套餐里 → 换下一个；其它错误（鉴权、参数）也试下一个但记下来
+    console.error("qwen chat failed", lastErr);
+    if (r.status === 401 || r.status === 403) break;
+  }
+  throw new Error("chat: " + lastErr);
+}
 async function qwenIngredients(name: string): Promise<string[]> {
-  const body = {
-    model: QWEN_CHAT_MODEL, stream: false, enable_thinking: false, temperature: 0.2,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: "你是中餐家常菜助手。用户给出一道菜，列出在家做这道菜通常需要买的东西：主料、配菜、以及这道菜特有的调料。不要列盐、糖、油、水、生抽、老抽、料酒、葱姜蒜这类几乎每家都有的基础调料。简体中文，每项 2 到 6 个字，5 到 10 项。只返回 JSON：{\"items\":[\"...\"]}" },
-      { role: "user", content: name },
-    ],
-  };
-  const r = await fetch(`${DASHSCOPE_BASE_URL}/chat/completions`, { method: "POST", headers: { authorization: `Bearer ${DASHSCOPE_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify(body) });
-  const txt = await r.text();
-  if (!r.ok) { console.error("qwen chat failed", r.status, txt.slice(0, 500)); throw new Error("chat"); }
-  const content = String(JSON.parse(txt)?.choices?.[0]?.message?.content || "");
+  const sys = "你是中餐家常菜助手。用户给出一道菜，列出在家做这道菜通常需要买的东西：主料、配菜、以及这道菜特有的调料。不要列盐、糖、油、水、生抽、老抽、料酒、葱姜蒜这类几乎每家都有的基础调料。简体中文，每项 2 到 6 个字，5 到 10 项。只返回 JSON：{\"items\":[\"...\"]}";
+  let content = "";
+  try { content = await qwenChat([{ role: "system", content: sys }, { role: "user", content: name }], { response_format: { type: "json_object" } }); }
+  catch (e) {
+    // 有的模型不支持 json_object，去掉再试一次
+    if (String(e).includes("response_format") || String(e).includes("400")) content = await qwenChat([{ role: "system", content: sys }, { role: "user", content: name }]);
+    else throw e;
+  }
   let items: unknown = [];
   try { const j = JSON.parse(content); items = Array.isArray(j) ? j : (j.items || j.ingredients || []); }
   catch { const m = content.match(/\[[\s\S]*\]/); if (m) { try { items = JSON.parse(m[0]); } catch { items = []; } } }
@@ -258,11 +272,20 @@ Deno.serve(async (req: Request) => {
       }
       // 再用主地址真跑一次最小对话，看套餐是否放行这个模型
       let chat: unknown = null;
-      try {
-        const r = await fetch(`${DASHSCOPE_BASE_URL}/chat/completions`, { method: "POST", headers: { authorization: `Bearer ${k}`, "content-type": "application/json" }, body: JSON.stringify({ model: QWEN_CHAT_MODEL, enable_thinking: false, messages: [{ role: "user", content: "回复：好" }] }) });
-        chat = { status: r.status, snippet: (await r.text()).slice(0, 200) };
-      } catch (e) { chat = { status: 0, snippet: String(e).slice(0, 160) }; }
+      try { const reply = await qwenChat([{ role: "user", content: "回复一个字：好" }]); chat = { ok: true, model: workingChatModel, reply: reply.slice(0, 50) }; }
+      catch (e) { chat = { ok: false, error: String(e).slice(0, 300) }; }
       return json({ keyLength: k.length, keyStartsWith: k.slice(0, 6), tokenPlan: IS_TOKEN_PLAN, usingBase: DASHSCOPE_BASE_URL, asrBase: ASR_BASE_URL, keyHasWhitespace: /\s/.test(k), keyHasQuotes: /["'“”‘’]/.test(k), results, chatTest: chat });
+    }
+
+    // 列出当前地址 / key 能用的模型（看套餐包含什么）
+    if (m === "GET" && path === "/api/qwen-models") {
+      try {
+        const r = await fetch(`${DASHSCOPE_BASE_URL}/models`, { headers: { authorization: `Bearer ${DASHSCOPE_API_KEY}` } });
+        const t = await r.text();
+        let ids: string[] = [];
+        try { const j = JSON.parse(t); ids = (j.data || []).map((x: { id: string }) => x.id); } catch { /* 原样返回 */ }
+        return json({ base: DASHSCOPE_BASE_URL, status: r.status, count: ids.length, models: ids, raw: ids.length ? undefined : t.slice(0, 500), workingChatModel, candidates: CHAT_CANDIDATES });
+      } catch (e) { return json({ error: String(e) }, 502); }
     }
 
     if (m === "GET" && path === "/api/state") {
