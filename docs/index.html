@@ -271,7 +271,7 @@ var PEOPLE = { mom:{name:'妈妈',emoji:'👩'}, kid:{name:'女儿',emoji:'👧'
 var MEMBERS = ['kid','jim'];
 var DINNER_DEFAULT_HOUR = 17, DINNER_ROLL_HOUR = 20;
 var NAV = { mom:['today','shop','recipes'], kid:['order','breakfast','shop','recipes'], jim:['order','breakfast','shop','recipes'] };
-var VIEW_NAMES = { today:'今天', order:'点菜', breakfast:'早饭', shop:'买菜', recipes:'菜谱' };
+var VIEW_NAMES = { today:'吃啥', order:'点菜', breakfast:'早饭', shop:'买菜', recipes:'菜单' };
 var VIEWS = ['today','order','breakfast','shop','recipes'];
 
 var state = { dishes:[], pick:null, pickDate:null, wishes:[], plans:{}, shopping:[], frequent:[], voice:false, ai:false, autoPickHour:6 };
@@ -484,7 +484,7 @@ function renderOrder(){
   var list=dishesOf('dinner').slice().sort(function(a,b){ return (b.mom?1:0)-(a.mom?1:0); });
   var grid=$('orderGrid');
   if(!loaded) grid.innerHTML='<div class="empty">正在打开…</div>';
-  else if(!list.length) grid.innerHTML='<div class="empty">菜谱里还没有正餐，先在下面说一道想吃的</div>';
+  else if(!list.length) grid.innerHTML='<div class="empty">菜单里还没有正餐，先在下面说一道想吃的</div>';
   else grid.innerHTML=list.map(function(d){ var w=mine[d.id]; var meta=w&&w.status==='planned'&&w.plannedFor?'妈妈安排在'+(w.plannedFor===today()?'今晚':w.plannedFor===addDays(today(),1)?'明晚':weekday(w.plannedFor)):(d.mom?'妈妈的拿手菜':''); return '<button type="button" class="card'+(w?' selected':'')+'" data-id="'+d.id+'" aria-pressed="'+(w?'true':'false')+'">'+picHtml(d)+'<div class="name">'+esc(d.name)+'</div>'+(w?'<div class="tick">✓ 已点</div>':'')+(meta?'<div class="meta">'+esc(meta)+'</div>':'')+'</button>'; }).join('');
   Array.prototype.forEach.call(grid.querySelectorAll('.card'), function(el){ el.onclick=function(){ var id=Number(el.getAttribute('data-id')), w=mine[id]; if(w) act(api('/api/wishes/'+w.id+'/remove',{method:'POST'}),'取消了'); else act(api('/api/wishes',{method:'POST',json:{who:role,dishId:id}}),'点好了，妈妈会看到'); }; });
   // 心愿单
@@ -505,7 +505,7 @@ function renderBreakfast(){
   $('pickHint').textContent='点图片选'+(td===today()?'今早':'明早')+'的早饭，可以选几样，再点一下取消。早上 '+(state.autoPickHour||6)+' 点还没选就自动随机';
   var grid=$('pickGrid');
   if(!loaded) grid.innerHTML='<div class="empty">正在打开…</div>';
-  else if(!list.length) grid.innerHTML='<div class="empty">菜谱里还没有早饭，到「菜谱」加</div>';
+  else if(!list.length) grid.innerHTML='<div class="empty">菜单里还没有早饭，到「菜单」加</div>';
   else { var selIds=pickedIds(cur); grid.innerHTML=list.map(function(d){ var sel=selIds.indexOf(d.id)>=0; return '<button type="button" class="card'+(sel?' selected':'')+'" data-id="'+d.id+'" aria-pressed="'+(sel?'true':'false')+'">'+picHtml(d)+'<div class="name">'+esc(d.name)+'</div>'+(sel?'<div class="tick">✓ 就吃这个</div>':'')+'</button>'; }).join(''); }
   Array.prototype.forEach.call(grid.querySelectorAll('.card'), function(el){ el.onclick=function(){ var ids=pickedIds(cur), id=Number(el.getAttribute('data-id')), k=ids.indexOf(id); if(k>=0) ids.splice(k,1); else ids.push(id); act(api('/api/pick',{method:'POST',json:{type:'dishes',ids:ids,date:td}})).then(function(r){ if(r) toast(r.pick?'选好了：'+r.pick.resolvedName:'取消了'); }); }; });
   $('pickStatus').textContent=cur?(cur.type==='skip'?'已选好：不吃':'已选好：'+cur.resolvedName+(cur.auto?'（自动随机的）':cur.type==='random'?'（随便选的）':'')):(loaded?'还没选，不选就是'+FALLBACK_NAME:'');
@@ -541,7 +541,7 @@ function renderShop(){
   var chips=$('dishChips');
   if(simple) chips.innerHTML='';
   else if(!loaded) chips.innerHTML='<p class="note">正在打开…</p>';
-  else if(!all.length) chips.innerHTML='<p class="note">菜谱还是空的</p>';
+  else if(!all.length) chips.innerHTML='<p class="note">菜单还是空的</p>';
   else chips.innerHTML=all.map(function(d){ var on=openIds.indexOf(d.id)>=0; var tag=planned[d.id]?'<span class="tag">'+esc(planned[d.id])+'</span>':wished[d.id]?'<span class="tag" style="background:var(--good)">想吃</span>':''; return '<button type="button" data-id="'+d.id+'" class="'+(on?'on':'')+'">'+esc(d.emoji||'')+' '+esc(d.name)+tag+'</button>'; }).join('');
   Array.prototype.forEach.call(chips.querySelectorAll('button'), function(b){ b.onclick=function(){ var id=Number(b.getAttribute('data-id')); shopOpen = (shopOpen===id) ? -1 : id; renderShop(); }; });
   // 2) 展开的菜：食材可点
@@ -656,7 +656,7 @@ function shrink(file){
 function uploadPhoto(id, file){ toast('正在上传照片…'); shrink(file).then(function(blob){ return api('/api/dishes/'+id+'/photo',{method:'POST',blob:blob}); }).then(function(){ toast('照片换好了'); return loadState(); }).catch(function(e){ toast(e.message||'照片没传上'); }); }
 function addDish(name){
   var v=cleanName(name)||String(name||'').trim(); if(!v) return Promise.resolve();
-  return act(api('/api/dishes',{method:'POST',json:{name:v,cat:newCat,mom:role==='mom',by:role}})).then(function(r){ if(r){ toast(r.existed?'菜谱里已经有了':'加上了：'+v); if(r.dish){ expandedId=r.dish.id; renderRecipes(); } } $('newDishName').value=''; });
+  return act(api('/api/dishes',{method:'POST',json:{name:v,cat:newCat,mom:role==='mom',by:role}})).then(function(r){ if(r){ toast(r.existed?'菜单里已经有了':'加上了：'+v); if(r.dish){ expandedId=r.dish.id; renderRecipes(); } } $('newDishName').value=''; });
 }
 $('addForm').onsubmit=function(e){ e.preventDefault(); addDish($('newDishName').value); };
 $('btnDishVoice').onclick=function(){ voiceCapture({btn:$('btnDishVoice'),status:$('recipeStatus'),input:$('newDishName'),onText:function(t){ $('newDishName').value=cleanName(t); addDish(t); }}); };
