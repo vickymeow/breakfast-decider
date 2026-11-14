@@ -238,6 +238,21 @@ Deno.serve(async (req: Request) => {
   try {
     if (m === "GET" && path === "/") return json({ ok: true, hint: "这是早饭决定器的接口；网页请打开 GitHub Pages 的地址。", qwenKey: DASHSCOPE_API_KEY ? "已配置" : "没有读到 DASHSCOPE_API_KEY", qwenBase: DASHSCOPE_BASE_URL, asrModel: QWEN_ASR_MODEL, chatModel: QWEN_CHAT_MODEL });
 
+    // 自检：key 的样子 + 几个地址哪个认这把 key（不泄露 key 本身）
+    if (m === "GET" && path === "/api/qwen-check") {
+      const k = DASHSCOPE_API_KEY;
+      const bases = [DASHSCOPE_BASE_URL, "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "https://dashscope.aliyuncs.com/compatible-mode/v1", "https://dashscope-us.aliyuncs.com/compatible-mode/v1"].filter((b, i, a) => a.indexOf(b) === i);
+      const results = [];
+      for (const b of bases) {
+        try {
+          const r = await fetch(`${b}/models`, { headers: { authorization: `Bearer ${k}` } });
+          const t = await r.text();
+          results.push({ base: b, status: r.status, ok: r.ok, snippet: t.slice(0, 160) });
+        } catch (e) { results.push({ base: b, status: 0, ok: false, snippet: String(e).slice(0, 160) }); }
+      }
+      return json({ keyLength: k.length, keyStartsWith: k.slice(0, 3), keyHasWhitespace: /\s/.test(k), keyHasQuotes: /["'“”‘’]/.test(k), results });
+    }
+
     if (m === "GET" && path === "/api/state") {
       let { db, changed } = await loadDb();
       const qDate = url.searchParams.get("date") || "";
