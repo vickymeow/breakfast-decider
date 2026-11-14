@@ -39,7 +39,7 @@ const DASHSCOPE_BASE_URL = (Deno.env.get("DASHSCOPE_BASE_URL") || DEFAULT_BASE).
 const QWEN_ASR_MODEL = Deno.env.get("QWEN_ASR_MODEL") || "qwen3-asr-flash";
 const QWEN_CHAT_MODEL = Deno.env.get("QWEN_CHAT_MODEL") || "qwen-flash";
 // 对话模型候选：配置的优先，其余按便宜到贵排；套餐里没有的（404 model_not_found）自动跳过，记住能用的
-const CHAT_CANDIDATES = [QWEN_CHAT_MODEL, "qwen-flash", "qwen-turbo", "qwen-plus", "qwen3-max", "qwen-max", "qwen3-coder-flash", "qwen3-coder-plus"].filter((x, i, a) => a.indexOf(x) === i);
+const CHAT_CANDIDATES = [QWEN_CHAT_MODEL, "qwen3.8-flash", "qwen3.6-flash", "qwen3.7-plus", "qwen3.6-plus", "qwen-flash", "qwen-turbo", "qwen-plus", "qwen3.8-max", "qwen3.7-max", "qwen3-max", "qwen-max"].filter((x, i, a) => a.indexOf(x) === i);
 let workingChatModel: string | null = null;
 // 语音识别可以单独用另一把 key / 地址（套餐若不含 ASR 模型时用按量付费的普通 key）
 const ASR_API_KEY = (Deno.env.get("QWEN_ASR_API_KEY") || DASHSCOPE_API_KEY).trim();
