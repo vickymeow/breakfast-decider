@@ -140,6 +140,10 @@ h3.sec{font-size:22px;color:var(--muted);margin:18px 0 8px}
 .plan-dish{border-top:2px solid var(--line);padding:10px 0}
 .plan-dish:first-of-type{border-top:none;padding-top:0}
 .plan-dish .t{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:24px;font-weight:800}
+.plan-dish .t .fold{flex:1;min-width:0;display:flex;align-items:center;gap:8px;text-align:left;border:none;background:none;padding:6px 0;font:inherit;color:inherit}
+.plan-dish .t .fold .arr{font-size:18px;color:var(--muted);flex-shrink:0;width:18px}
+.plan-dish .t .fold small{font-size:16px;color:var(--muted);font-weight:400}
+.plan-dish .sum{font-size:19px;color:var(--muted);margin:-2px 0 4px 26px}
 .plan-dish .t button{margin-left:auto;font-size:19px;padding:8px 12px;border-radius:12px;border:2px solid var(--accent-deep);background:var(--paper);flex-shrink:0}
 .shop-row{display:flex;align-items:stretch;gap:8px;margin-bottom:8px}
 .shop-row .shop-item{margin:0;flex:1;min-width:0}
@@ -549,6 +553,7 @@ function plannedGroups(){
 function openItem(name){ var l=state.shopping||[]; for(var i=0;i<l.length;i++) if(!l[i].done&&l[i].name===name) return l[i]; return null; }
 function shopAdd(names, from){ names=names.filter(Boolean); if(!names.length) return Promise.resolve(); return act(api('/api/shopping',{method:'POST',json:{op:'add',names:names,from:from||''}}), names.length>1?'加了 '+names.length+' 样':'加了：'+names[0]); }
 var shopOpen=null;   // 买菜页里展开的那道菜；null 时默认展开已定要做的
+var shopFold={};     // 每道菜的食材折没折：true 折起，false 展开；没记录时食材都在清单里的默认折起
 function renderShop(){
   // 妈妈：不绕「菜」，只看定了要做的菜要用什么，平铺点选；女儿小陈：可以按菜浏览
   var simple = role==='mom';
@@ -573,15 +578,19 @@ function renderShop(){
   box.hidden=!openDishes.length;
   box.innerHTML=openDishes.map(function(d){
     var ing=d.ingredients||[]; var missing=ing.filter(function(x){ return !openItem(x); });
-    return '<div class="plan-dish" data-id="'+d.id+'"><div class="t">'+esc(d.emoji||'')+' '+esc(d.name)+(planned[d.id]?' <small style="font-size:16px;color:var(--muted);font-weight:400">'+esc(planned[d.id])+'</small>':'')+(ing.length&&missing.length?'<button type="button" data-act="all">都要买</button>':'')+'</div>'
-      +(ing.length?'<div class="chips">'+ing.map(function(x){ var on=!!openItem(x); return '<button type="button" data-ing="'+esc(x)+'" class="'+(on?'on':'')+'">'+(on?'✓ ':'')+esc(x)+'</button>'; }).join('')+'</div>'
+    var folded = shopFold[d.id]!==undefined ? shopFold[d.id] : (ing.length>0&&!missing.length);
+    var sum = !ing.length ? '' : !missing.length ? '都在清单里了 ✓' : '还要买 '+missing.length+' 样，点开看';
+    return '<div class="plan-dish" data-id="'+d.id+'"><div class="t"><button type="button" class="fold" data-act="fold"><span class="arr">'+(folded?'▶':'▼')+'</span><span>'+esc(d.emoji||'')+' '+esc(d.name)+'</span>'+(planned[d.id]?'<small>'+esc(planned[d.id])+'</small>':'')+'</button>'+(ing.length&&missing.length&&!folded?'<button type="button" data-act="all">都要买</button>':'')+'</div>'
+      +(folded ? '<div class="sum">'+sum+'</div>'
+      : ing.length?'<div class="chips">'+ing.map(function(x){ var on=!!openItem(x); return '<button type="button" data-ing="'+esc(x)+'" class="'+(on?'on':'')+'">'+(on?'✓ ':'')+esc(x)+'</button>'; }).join('')+'</div>'
         :'<div class="note" style="text-align:left;margin:0 0 6px">还没填食材</div><div class="row"><button type="button" class="big-btn ghost" data-act="ingvoice">🎤 说食材</button>'+(state.ai?'<button type="button" class="big-btn ghost" data-act="ai">✨ AI 填</button>':'')+'</div><p class="note" data-st style="text-align:left;margin:4px 0 0"></p>')
       +'</div>'; }).join('');
   Array.prototype.forEach.call(box.querySelectorAll('.plan-dish'), function(el){
     var d=dishById(Number(el.getAttribute('data-id'))); if(!d) return;
     Array.prototype.forEach.call(el.querySelectorAll('[data-ing]'), function(b){ b.onclick=function(){ var x=b.getAttribute('data-ing'), it=openItem(x); if(it) act(api('/api/shopping',{method:'POST',json:{op:'remove',id:it.id}}),'拿掉了'); else shopAdd([x], d.name); }; });
     Array.prototype.forEach.call(el.querySelectorAll('[data-act]'), function(b){ var a=b.getAttribute('data-act'); b.onclick=function(){
-      if(a==='all') shopAdd((d.ingredients||[]).filter(function(x){ return !openItem(x); }), d.name);
+      if(a==='fold'){ var ing2=d.ingredients||[], miss2=ing2.filter(function(x){ return !openItem(x); }); var cur=shopFold[d.id]!==undefined?shopFold[d.id]:(ing2.length>0&&!miss2.length); shopFold[d.id]=!cur; renderShop(); }
+      else if(a==='all') shopAdd((d.ingredients||[]).filter(function(x){ return !openItem(x); }), d.name);
       else if(a==='ingvoice') voiceCapture({btn:b,status:el.querySelector('[data-st]'),input:null,onText:function(t){ var add=parseList(t); if(add.length) saveIngredients(d, add); else el.querySelector('[data-st]').textContent='没听出食材，再说一次'; }});
       else if(a==='ai'){ el.querySelector('[data-st]').textContent='AI 正在想…'; api('/api/ingredients',{method:'POST',json:{name:d.name}}).then(function(r){ if(!(r.items||[]).length){ el.querySelector('[data-st]').textContent='AI 没给出食材'; return; } return saveIngredients(d, r.items); }).catch(function(e){ el.querySelector('[data-st]').textContent=e.message||'AI 出错了'; }); }
     }; });
