@@ -57,7 +57,10 @@ header p{font-size:19px;color:var(--muted);margin:2px 0 0;min-height:1.3em}
 nav{display:flex;gap:10px;position:sticky;top:env(safe-area-inset-top);background:var(--bg);z-index:5;padding:10px 0}
 nav button{flex:1;min-width:0;font-size:1.35em;font-weight:700;padding:16px 4px;border:3px solid var(--accent-deep);border-radius:18px;background:var(--paper)}
 nav button.active{background:var(--accent)}
-nav button{position:relative}
+nav button{position:relative;white-space:nowrap}
+/* 女儿、小陈有 4 个页签：三个字的名字也要放得下 */
+nav.four{gap:6px}
+nav.four button{font-size:21px;padding:14px 2px}
 nav .badge{position:absolute;top:-8px;right:-6px;min-width:26px;height:26px;padding:0 7px;border-radius:13px;background:var(--bad);color:#fff;font-size:16px;line-height:26px;text-align:center}
 .view{display:none;padding-top:6px}.view.active{display:block}
 .hint{font-size:21px;color:var(--muted);text-align:center;margin:6px 0 12px}
@@ -158,6 +161,13 @@ h3.sec{font-size:22px;color:var(--muted);margin:18px 0 8px}
 .menu-list .mname{flex:1;min-width:110px;font-size:25px;font-weight:700;overflow-wrap:anywhere}
 .menu-list .mname small{display:block;font-size:17px;color:var(--muted);font-weight:400}
 .menu-list .open{font-size:20px;padding:10px 14px;border-radius:14px;border:2px solid var(--line);background:var(--bg);flex-shrink:0}
+.menu-list .drag{flex-shrink:0;width:44px;height:60px;display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--muted);border:2px dashed var(--line);border-radius:12px;background:var(--bg);touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.menu-list li.dragging{border-color:var(--pick);background:var(--pick-soft);box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.menu-list li.dragging .drag{border-color:var(--pick);color:var(--pick);cursor:grabbing}
+.menu-tip{font-size:18px;color:var(--muted);background:var(--paper);border:2px dashed var(--line);border-radius:14px;padding:10px 12px;margin:4px 0 6px;line-height:1.5}
+.menu-tip b{color:var(--fg)}
+.sughead{display:flex;align-items:center;gap:8px}
+.sughead .secfold{flex:1;min-width:0;margin:6px 0}
 .detail{margin-top:12px;border-top:2px solid var(--line);padding-top:12px}
 .detail .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .detail .acts button,.detail .acts label{font-size:20px;padding:10px 12px;border-radius:14px;border:2px solid var(--line);background:var(--bg);cursor:pointer;display:inline-block}
@@ -264,7 +274,7 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
   <p id="pickStatus" class="status"></p>
 </section>
 
-<!-- 买菜（全家） -->
+<!-- 菜篮子（全家） -->
 <section id="view-shop" class="view">
   <h2 class="sec" style="margin-top:6px">要买的东西 <small id="shopCount"></small></h2>
   <form class="add-row" id="shopForm">
@@ -273,15 +283,16 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
     <button type="submit" class="big-btn">加</button>
   </form>
   <p id="shopStatus" class="note"></p>
-  <div id="suggestBox"></div>
   <div id="shopList"></div>
-  <button type="button" id="btnClearDone" class="big-btn primary" style="width:100%" hidden>✅ 已下单，清空买菜篮</button>
+  <button type="button" id="btnClearDone" class="big-btn primary" style="width:100%" hidden>✅ 已下单，清空菜篮子</button>
+  <button type="button" class="secfold" id="foldShopSug" hidden></button>
+  <div id="suggestBox"></div>
   <h2 class="sec" id="shopSecTitle" hidden>按菜加 <small>点一道菜，再点它的食材</small></h2>
   <div class="chips" id="dishChips"></div>
   <div id="planBox" class="box" hidden style="margin-top:10px"></div>
 </section>
 
-<!-- 菜谱（全家） -->
+<!-- 菜谱本（全家） -->
 <section id="view-recipes" class="view">
   <p class="hint">说一道菜的名字就能加进去；食材也可以说</p>
   <form class="add-row" id="addForm">
@@ -297,6 +308,7 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
   <button type="button" id="btnMenuSuggest" class="big-btn ghost" style="width:100%" hidden>✨ 推荐几道新菜</button>
   <p id="menuSuggestStatus" class="note"></p>
   <div id="menuSuggest"></div>
+  <p class="menu-tip"><b>⭐ 拿手菜</b> = 妈妈最会做的菜：点菜页排在前面，妈妈定晚饭时单独列一栏。在菜的「详情」里设置。<br><b>☰ 按住上下拖</b>，排菜的顺序；有 🧧 红包的菜自动排最前。</p>
   <button type="button" class="secfold" id="foldDinner"></button>
   <ul id="listDinner" class="menu-list"></ul>
   <button type="button" class="secfold" id="foldBreakfast"></button>
@@ -317,10 +329,10 @@ var PEOPLE = { mom:{name:'妈妈',emoji:'👩'}, kid:{name:'女儿',emoji:'👧'
 var MEMBERS = ['kid','jim'];
 var DINNER_DEFAULT_HOUR = 17, DINNER_ROLL_HOUR = 20;
 var NAV = { mom:['today','shop','recipes'], kid:['order','breakfast','shop','recipes'], jim:['order','breakfast','shop','recipes'] };
-var VIEW_NAMES = { today:'吃啥', order:'点菜', breakfast:'早饭', shop:'买菜', recipes:'菜单' };
+var VIEW_NAMES = { today:'小饭桌', order:'点个菜', breakfast:'早饭碗', shop:'菜篮子', recipes:'菜谱本' };
 var VIEWS = ['today','order','breakfast','shop','recipes'];
 
-var state = { dishes:[], pick:null, pickDate:null, wishes:[], plans:{}, shopping:[], frequent:[], profiles:{}, voice:false, ai:false, autoPickHour:6 };
+var state = { dishes:[], pick:null, pickDate:null, wishes:[], plans:{}, shopping:[], staples:[], recent:[], profiles:{}, voice:false, ai:false, autoPickHour:6 };
 var HB=window.HONGBAO||{}, HB_UNIT=HB.unit||'', HB_AMOUNTS=(HB.amounts&&HB.amounts.length)?HB.amounts:[5,10,20,50,100];
 var loaded=false, role=null, lastOk=0;
 var pendingDelete=null, expandedId=null, chooser=null, newCat='dinner';
@@ -466,6 +478,7 @@ function uiBusy(){
   var a=document.activeElement;
   if(a&&a.tagName==='INPUT'&&a.type!=='file') return true;      // 正在打字
   if(recorder) return true;                                       // 正在录音
+  if(dragState) return true;                                      // 正在拖菜排顺序
   return false;
 }
 function render(){
@@ -538,7 +551,7 @@ function renderDinner(){
     var ds=(plan.cook.dishIds||[]).map(dishById).filter(Boolean), miss=[], noIng=[];
     ds.forEach(function(d){ if(!(d.ingredients||[]).length) noIng.push(d.name); (d.ingredients||[]).forEach(function(x){ if(!inList(x)&&miss.indexOf(x)<0) miss.push(x); }); });
     if(!miss.length&&!noIng.length) return '';
-    return '<div class="tmr" style="text-align:left"><b>材料</b>'+(miss.length?'：'+esc(miss.join('、'))+' <button type="button" class="big-btn ghost sm" data-goshop="1">去买菜页点一下</button>':'')+(noIng.length?'<div class="note" style="text-align:left;margin:6px 0 0">'+esc(noIng.join('、'))+' 还没填食材</div>':'')+'</div>';
+    return '<div class="tmr" style="text-align:left"><b>材料</b>'+(miss.length?'：'+esc(miss.join('、'))+' <button type="button" class="big-btn ghost sm" data-goshop="1">去菜篮子点一下</button>':'')+(noIng.length?'<div class="note" style="text-align:left;margin:6px 0 0">'+esc(noIng.join('、'))+' 还没填食材</div>':'')+'</div>';
   }
   // 明晚、后天：一行看清 哪天（周几）、做什么、谁回来
   function dayRow(p){
@@ -660,16 +673,23 @@ $('otherForm').onsubmit=function(e){ e.preventDefault(); var v=cleanName($('othe
 $('btnOtherVoice').onclick=function(){ voiceCapture({btn:$('btnOtherVoice'),status:$('otherStatus'),input:$('otherInput'),onText:function(t){ var v=cleanName(t); if(v){ $('otherInput').value=''; orderWish({who:role,name:v}, v); } }}); };
 
 // AI 推荐新菜（点菜页：直接点；菜单页：加进菜单）
-var suggestions={order:[],menu:[]};
+var suggestions={order:[],menu:[]}, sugFold={order:false,menu:false};
 function loadSuggest(where, cat){
   var st=$(where+'SuggestStatus'); st.textContent='AI 正在想…';
-  api('/api/suggest',{method:'POST',json:{cat:cat}}).then(function(r){ suggestions[where]=(r.items||[]).map(function(x){ return {name:x.name,ingredients:x.ingredients||[],cat:cat}; }); st.textContent=suggestions[where].length?'':'AI 没想出新的，再点一次'; renderSuggest(where); })
+  api('/api/suggest',{method:'POST',json:{cat:cat}}).then(function(r){ sugFold[where]=false; suggestions[where]=(r.items||[]).map(function(x){ return {name:x.name,ingredients:x.ingredients||[],cat:cat}; }); st.textContent=suggestions[where].length?'':'AI 没想出新的，再点一次'; renderSuggest(where); })
     .catch(function(e){ st.textContent=e.message||'AI 出错了，请再试一次'; });
 }
 function renderSuggest(where){
-  var box=$(where+'Suggest'), l=suggestions[where];
-  box.innerHTML=l.map(function(x,i){ return '<div class="wish"><span class="n">'+esc(x.name)+(x.ingredients.length?'<small>'+esc(x.ingredients.slice(0,6).join('、'))+'</small>':'')+'</span><button type="button" class="x go" data-i="'+i+'">'+(where==='order'?'想吃':'加进菜单')+'</button></div>'; }).join('');
+  var box=$(where+'Suggest'), l=suggestions[where], f=sugFold[where];
+  if(!l.length){ box.innerHTML=''; return; }
+  // 推荐的结果可以折起来，也可以一道一道删，或者全部清掉
+  box.innerHTML='<div class="sughead"><button type="button" class="secfold" data-act="fold"><span class="arr">'+(f?'▶':'▼')+'</span>AI 推荐 <small>'+l.length+' 道'+(f?'，点开看':'')+'</small></button><button type="button" class="big-btn ghost sm" data-act="clear">全部清掉</button></div>'
+    +(f?'':l.map(function(x,i){ return '<div class="wish"><span class="n">'+esc(x.name)+(x.ingredients.length?'<small>'+esc(x.ingredients.slice(0,6).join('、'))+'</small>':'')+'</span><button type="button" class="x go" data-i="'+i+'">'+(where==='order'?'想吃':'加进菜单')+'</button><button type="button" class="x" data-rm="'+i+'" aria-label="不要这道">✕ 不要</button></div>'; }).join(''));
   Array.prototype.forEach.call(box.querySelectorAll('button'), function(b){ b.onclick=function(){
+    var a=b.getAttribute('data-act');
+    if(a==='fold'){ sugFold[where]=!sugFold[where]; renderSuggest(where); return; }
+    if(a==='clear'){ suggestions[where]=[]; $(where+'SuggestStatus').textContent=''; renderSuggest(where); return; }
+    if(b.getAttribute('data-rm')!=null){ l.splice(Number(b.getAttribute('data-rm')),1); renderSuggest(where); return; }
     var x=l.splice(Number(b.getAttribute('data-i')),1)[0]; renderSuggest(where); if(!x) return;
     var p=api('/api/dishes',{method:'POST',json:{name:x.name,cat:x.cat,ingredients:x.ingredients,mom:false,by:role}});
     if(where==='order') p.then(function(r){ return orderWish({who:role,dishId:r.dish.id}, x.name); }).catch(function(e){ toast(e.message||'没成功，请再试一次'); });
@@ -687,7 +707,7 @@ function renderBreakfast(){
   $('pickHint').textContent='点图片选'+(td===today()?'今早':'明早')+'的早饭，可以选几样，再点一下取消。早上 '+(state.autoPickHour||6)+' 点还没选就自动随机';
   var grid=$('pickGrid');
   if(!loaded) grid.innerHTML='<div class="empty">正在打开…</div>';
-  else if(!list.length) grid.innerHTML='<div class="empty">菜单里还没有早饭，到「菜单」加</div>';
+  else if(!list.length) grid.innerHTML='<div class="empty">菜单里还没有早饭，到「菜谱本」加</div>';
   else { var selIds=pickedIds(cur); grid.innerHTML=list.map(function(d){ var sel=selIds.indexOf(d.id)>=0; return '<button type="button" class="card'+(sel?' selected':'')+'" data-id="'+d.id+'" aria-pressed="'+(sel?'true':'false')+'">'+picHtml(d)+'<div class="name">'+esc(d.name)+'</div>'+(sel?'<div class="tick">✓ 就吃这个</div>':'')+'</button>'; }).join(''); }
   Array.prototype.forEach.call(grid.querySelectorAll('.card'), function(el){ el.onclick=function(){ var ids=pickedIds(cur), id=Number(el.getAttribute('data-id')), k=ids.indexOf(id); if(k>=0) ids.splice(k,1); else ids.push(id); act(api('/api/pick',{method:'POST',json:{type:'dishes',ids:ids,date:td}})).then(function(r){ if(r) toast(r.pick?'选好了：'+r.pick.resolvedName:'取消了'); }); }; });
   $('pickStatus').textContent=cur?(cur.type==='skip'?'已选好：不吃':'已选好：'+cur.resolvedName+(cur.auto?'（自动随机的）':cur.type==='random'?'（随便选的）':'')):(loaded?'还没选，不选就是'+FALLBACK_NAME:'');
@@ -697,9 +717,9 @@ $('btnRandom').onclick=function(){ act(api('/api/pick',{method:'POST',json:{type
 $('btnSkip').onclick=function(){ act(api('/api/pick',{method:'POST',json:{type:'skip',date:targetDate()}}),'好，早饭不吃'); };
 
 // 买菜（全家）
+// 买菜默认按晚饭来：只看三天里定好的晚饭（早饭不算）
 function plannedGroups(){
-  var out=[], cur=pickIsCurrent()?state.pick:null;
-  if(cur&&cur.type!=='skip'){ var ds=pickedIds(cur).map(dishById).filter(Boolean); if(ds.length) out.push({label:(targetDate()===today()?'今早':'明早')+'早饭', dishes:ds}); }
+  var out=[];
   planDays().forEach(function(pl){ if(pl.cook&&pl.cook.dishIds&&pl.cook.dishIds.length){ var ds2=pl.cook.dishIds.map(dishById).filter(Boolean); if(ds2.length) out.push({label:nightLabel(pl.date), dishes:ds2}); } });
   return out;
 }
@@ -717,8 +737,8 @@ function renderShop(){
   else { title.hidden=false; title.innerHTML='按菜加 <small>点一道菜，再点它的食材</small>'; $('dishChips').hidden=false; }
   var wished={}; (state.wishes||[]).forEach(function(w){ if(w.status!=='done') wished[w.dishId]=true; });
   var all=(state.dishes||[]).slice().sort(function(a,b){
-    var ra=planned[a.id]?0:wished[a.id]?1:(a.mom&&a.cat==='dinner')?2:3, rb=planned[b.id]?0:wished[b.id]?1:(b.mom&&b.cat==='dinner')?2:3;
-    return ra-rb;
+    function rk(d){ return planned[d.id]?0:wished[d.id]?1:d.cat!=='dinner'?4:d.mom?2:3; }
+    return rk(a)-rk(b);
   });
   var openIds = shopOpen!=null ? [shopOpen] : Object.keys(planned).map(Number);
   var chips=$('dishChips');
@@ -755,10 +775,37 @@ function renderShop(){
   // 输入框下面的快捷按钮：① 定了要做的菜还缺的食材 ② 家里常买的
   var need=[]; plannedGroups().forEach(function(g){ g.dishes.forEach(function(d){ (d.ingredients||[]).forEach(function(x){ if(!inList(x)&&!need.some(function(y){ return y.x===x; })) need.push({x:x,from:d.name}); }); }); });
   need=need.slice(0,12);
-  var fq=(state.frequent||[]).filter(function(n){ return !inList(n)&&!need.some(function(y){ return y.x===n; }); }).slice(0,8);
-  $('suggestBox').innerHTML=(need.length?'<div class="sg"><span class="sgl">做菜要用（按定好的菜）</span><div class="chips">'+need.map(function(y){ return '<button type="button" data-n="'+esc(y.x)+'" data-from="'+esc(y.from)+'">＋ '+esc(y.x)+'<small>'+esc(y.from)+'</small></button>'; }).join('')+'</div></div>':'')
-    +(fq.length?'<div class="sg"><span class="sgl">常买</span><div class="chips">'+fq.map(function(n){ return '<button type="button" data-n="'+esc(n)+'">＋ '+esc(n)+'</button>'; }).join('')+'</div></div>':'');
-  Array.prototype.forEach.call($('suggestBox').querySelectorAll('button'), function(b){ b.onclick=function(){ shopAdd([b.getAttribute('data-n')], b.getAttribute('data-from')||''); }; });
+  var staples=state.staples||[], recent=(state.recent||[]).filter(function(n){ return staples.indexOf(n)<0; }).slice(0,12);
+  var fq=staples.filter(function(n){ return !inList(n)&&!need.some(function(y){ return y.x===n; }); });
+  // 推荐买的：放在清单下面，可以折起来（记在这台手机上）
+  var cnt=need.length+fq.length, fb=$('foldShopSug');
+  fb.hidden=!loaded;
+  fb.innerHTML='<span class="arr">'+(shopSugFold?'▶':'▼')+'</span>推荐买的 <small>'+(cnt?cnt+' 样':'')+(shopSugFold?(cnt?'，':'')+'点开看':'')+'</small>';
+  var sg='';
+  if(!shopSugFold){
+    if(need.length) sg+='<div class="sg"><span class="sgl">做菜要用（按定好的晚饭）</span><div class="chips">'+need.map(function(y){ return '<button type="button" data-n="'+esc(y.x)+'" data-from="'+esc(y.from)+'">＋ '+esc(y.x)+'<small>'+esc(y.from)+'</small></button>'; }).join('')+'</div></div>';
+    if(stapleEdit){
+      sg+='<div class="box"><h3>改常买</h3>'
+        +(staples.length?'<span class="sgl" style="display:block;font-size:18px;color:var(--muted);margin:0 0 6px">点一下就从常买里拿掉</span><div class="chips">'+staples.map(function(n){ return '<button type="button" data-rm="'+esc(n)+'">✕ '+esc(n)+'</button>'; }).join('')+'</div>':'<p class="note" style="text-align:left;margin:0">常买还是空的，加几样家里经常要买的</p>')
+        +'<form class="add-row" id="stapleForm" style="margin-top:10px"><input id="stapleInput" placeholder="加常买的，说一句或打字" autocomplete="off"><button type="button" id="btnStapleVoice" class="mic">🎤</button><button type="submit" class="big-btn">加</button></form><p class="note" id="stapleStatus" style="text-align:left"></p>'
+        +(recent.length?'<span class="sgl" style="display:block;font-size:18px;color:var(--muted);margin:0 0 6px">最近买过的，点一下加进常买</span><div class="chips">'+recent.map(function(n){ return '<button type="button" data-addst="'+esc(n)+'">＋ '+esc(n)+'</button>'; }).join('')+'</div>':'')
+        +'<button type="button" class="big-btn primary" id="stapleDone" style="width:100%;margin-top:12px">改好了</button></div>';
+    } else {
+      sg+='<div class="sg"><span class="sgl">常买</span><div class="chips">'+fq.map(function(n){ return '<button type="button" data-n="'+esc(n)+'">＋ '+esc(n)+'</button>'; }).join('')+'<button type="button" class="x" data-edit="1">'+(staples.length?'✏️ 改常买':'＋ 加几样常买的')+'</button></div>'+(staples.length&&!fq.length?'<p class="note" style="text-align:left;margin:6px 0 0">常买的都在清单里了</p>':'')+'</div>';
+    }
+  }
+  $('suggestBox').innerHTML=sg;
+  Array.prototype.forEach.call($('suggestBox').querySelectorAll('button'), function(b){ b.onclick=function(){
+    if(b.getAttribute('data-n')) shopAdd([b.getAttribute('data-n')], b.getAttribute('data-from')||'');
+    else if(b.getAttribute('data-edit')){ stapleEdit=true; renderShop(); }
+    else if(b.getAttribute('data-rm')) act(api('/api/staples',{method:'POST',json:{op:'remove',name:b.getAttribute('data-rm')}}),'从常买里拿掉了');
+    else if(b.getAttribute('data-addst')) stapleAdd([b.getAttribute('data-addst')]);
+    else if(b.id==='stapleDone'){ stapleEdit=false; renderShop(); }
+  }; });
+  if(stapleEdit&&!shopSugFold){
+    $('stapleForm').onsubmit=function(e){ e.preventDefault(); var add=parseList($('stapleInput').value); if(!add.length) return; $('stapleInput').value=''; $('stapleInput').blur(); stapleAdd(add); };
+    $('btnStapleVoice').onclick=function(){ voiceCapture({btn:$('btnStapleVoice'),status:$('stapleStatus'),input:$('stapleInput'),onText:function(t){ var add=parseList(t); if(!add.length){ $('stapleStatus').textContent='没听清，请再说一次'; return; } $('stapleInput').value=''; stapleAdd(add); }}); };
+  }
   var store=window.STORE&&window.STORE.search?window.STORE:null;
   function row(it){
     var btn='<button type="button" class="shop-item'+(it.done?' done':'')+'" data-id="'+it.id+'"><span class="bx">'+(it.done?'✓':'')+'</span><span class="nm">'+esc(it.name)+(it.from?'<small>'+esc(it.from)+'</small>':'')+'</span></button>';
@@ -769,24 +816,28 @@ function renderShop(){
   $('shopList').innerHTML=(open.length||done.length)?open.map(row).join('')+(done.length?'<h3 class="sec">买到了</h3>'+done.map(row).join(''):''):(loaded?'<p class="note">清单是空的。按 🎤 说一句要买什么就行'+(simple?'':'，或者在下面点一道菜加它的食材')+'</p>':'');
   Array.prototype.forEach.call($('shopList').querySelectorAll('.shop-item'), function(b){ b.onclick=function(){ act(api('/api/shopping',{method:'POST',json:{op:'toggle',id:Number(b.getAttribute('data-id'))}})); }; });
   $('btnClearDone').hidden=!(open.length||done.length);
-  $('btnClearDone').textContent = clearArmed ? '确定清空？再点一下' : '✅ 已下单，清空买菜篮';
+  $('btnClearDone').textContent = clearArmed ? '确定清空？再点一下' : '✅ 已下单，清空菜篮子';
   $('btnClearDone').classList.toggle('danger', clearArmed);
 }
 $('shopForm').onsubmit=function(e){ e.preventDefault(); var add=parseList($('shopInput').value); if(!add.length) return; shopAdd(add).then(function(){ $('shopInput').value=''; }); };
 $('btnShopVoice').onclick=function(){ voiceCapture({btn:$('btnShopVoice'),status:$('shopStatus'),input:$('shopInput'),onText:function(t){ var add=parseList(t); if(!add.length){ $('shopStatus').textContent='没听清，请再说一次'; return; } shopAdd(add); }}); };
 var clearArmed=false;
+var shopSugFold=load('bf_fold_shopsug')==='1', stapleEdit=false;
+$('foldShopSug').onclick=function(){ shopSugFold=!shopSugFold; store('bf_fold_shopsug', shopSugFold?'1':null); renderShop(); };
+function stapleAdd(names){ names=names.filter(Boolean); if(!names.length) return Promise.resolve(); return act(api('/api/staples',{method:'POST',json:{op:'add',names:names}}),'加进常买了：'+names.join('、')); }
 $('btnClearDone').onclick=function(){
   if(!clearArmed){ clearArmed=true; renderShop(); setTimeout(function(){ if(clearArmed){ clearArmed=false; renderShop(); } },4000); return; }
   clearArmed=false;
-  act(api('/api/shopping',{method:'POST',json:{op:'ordered'}}),'买菜篮清空了');
+  act(api('/api/shopping',{method:'POST',json:{op:'ordered'}}),'菜篮子清空了');
 };
 
 // 菜谱（全家）
 function dishRow(d, i, n){
   var open=expandedId===d.id;
+  var hb=hbTotal(d.id);
   var meta=(d.ingredients&&d.ingredients.length?'食材 '+d.ingredients.length+' 样':'还没填食材')+(d.cat==='dinner'?(d.lastMade?' · 上次 '+d.lastMade.slice(5).replace('-','/'):' · 没做过')+(d.times?' · 做过 '+d.times+' 次':''):'');
-  var html='<li data-id="'+d.id+'"><div class="top"><div class="thumb">'+esc(d.emoji||'🍽️')+(d.image?'<img src="'+esc(d.image)+'" alt="" onload="this.className=\'ok\'" onerror="this.remove()">':'')+'</div>'
-    +'<span class="mname">'+(d.mom&&d.cat==='dinner'?'⭐ ':'')+esc(d.name)+'<small>'+esc(meta)+'</small></span>'
+  var html='<li data-id="'+d.id+'"><div class="top"><span class="drag" data-drag="1" role="button" aria-label="按住上下拖，排顺序">☰</span><div class="thumb">'+esc(d.emoji||'🍽️')+(d.image?'<img src="'+esc(d.image)+'" alt="" onload="this.className=\'ok\'" onerror="this.remove()">':'')+'</div>'
+    +'<span class="mname">'+(d.mom&&d.cat==='dinner'?'⭐ ':'')+esc(d.name)+(hb?' <span class="hb">'+hbText(hb)+'</span>':'')+'<small>'+esc(meta)+'</small></span>'
     +'<button type="button" class="open" data-act="toggle">'+(open?'收起':'详情')+'</button></div>';
   if(open){
     var ing=(d.ingredients||[]);
@@ -797,7 +848,7 @@ function dishRow(d, i, n){
       +'<p class="note" id="ingStatus" style="text-align:left"></p>'
       +'<div class="acts">'+(state.ai?'<button type="button" data-act="ai">✨ AI 帮我填食材</button>':'')
       +'<label>📷 照片<input type="file" accept="image/*" data-act="photo"></label>'
-      +(d.cat==='dinner'?'<button type="button" data-act="mom">'+(d.mom?'⭐ 拿手菜':'☆ 设为拿手菜')+'</button>':'')
+      +(d.cat==='dinner'?'<button type="button" data-act="mom">'+(d.mom?'⭐ 是拿手菜（点一下取消）':'☆ 设为拿手菜')+'</button>':'')
       +'<button type="button" data-act="up" '+(i===0?'disabled':'')+'>↑</button><button type="button" data-act="down" '+(i===n-1?'disabled':'')+'>↓</button>'
       +'<button type="button" class="del'+(pendingDelete===d.id?' confirm':'')+'" data-act="del">'+(pendingDelete===d.id?'确定删除？':'删除')+'</button></div>'
       +(d.cat==='dinner'?'<p class="note" style="text-align:left;font-size:17px;margin:8px 0 0">⭐ 拿手菜 = 妈妈最会做的菜：排在点菜页前面，妈妈定晚饭时单独列一栏</p>':'')+'</div>';
@@ -805,8 +856,10 @@ function dishRow(d, i, n){
   return html+'</li>';
 }
 var menuFold={dinner:load('bf_fold_dinner')==='1', breakfast:load('bf_fold_breakfast')==='1'};
+// 菜单里的顺序：有红包的排最前（红包多的在前），其余按拖好的顺序
+function menuOrder(list){ return list.map(function(d,i){ return {d:d,i:i,hb:hbTotal(d.id)}; }).sort(function(a,b){ return (b.hb-a.hb)||(a.i-b.i); }).map(function(x){ return x.d; }); }
 function renderRecipes(){
-  var dn=dishesOf('dinner'), bf=dishesOf('breakfast');
+  var dn=menuOrder(dishesOf('dinner')), bf=menuOrder(dishesOf('breakfast'));
   [['foldDinner','dinner','正餐',dn,'listDinner'],['foldBreakfast','breakfast','早饭',bf,'listBreakfast']].forEach(function(x){
     $(x[0]).innerHTML='<span class="arr">'+(menuFold[x[1]]?'▶':'▼')+'</span>'+x[2]+' <small>'+x[3].length+' 道'+(menuFold[x[1]]?'，点开看':'')+'</small>';
     $(x[4]).hidden=menuFold[x[1]];
@@ -816,6 +869,7 @@ function renderRecipes(){
   ['listDinner','listBreakfast'].forEach(function(lid){
     Array.prototype.forEach.call($(lid).querySelectorAll('li'), function(li){
       var id=Number(li.getAttribute('data-id')), d=dishById(id); if(!d) return;
+      var h=li.querySelector('[data-drag]'); if(h) h.onpointerdown=function(e){ startDrag(e, li, $(lid), d.cat); };
       Array.prototype.forEach.call(li.querySelectorAll('[data-act]'), function(el){
         var a=el.getAttribute('data-act');
         if(a==='photo'){ el.onchange=function(){ if(el.files[0]) uploadPhoto(id, el.files[0]); }; return; }
@@ -823,6 +877,42 @@ function renderRecipes(){
       });
     });
   });
+}
+// 拖动排序：按住 ☰ 上下拖。只挪别的菜、不挪手指按着的那一行，手机上拖得才稳
+var dragState=null;
+function listIds(list){ return Array.prototype.filter.call(list.children, function(x){ return x.getAttribute('data-id'); }).map(function(x){ return Number(x.getAttribute('data-id')); }); }
+function sibLi(el, dir){ var s=dir<0?el.previousElementSibling:el.nextElementSibling; while(s&&!s.getAttribute('data-id')) s=dir<0?s.previousElementSibling:s.nextElementSibling; return s; }
+function startDrag(e, li, list, cat){
+  if(dragState||(e.button!=null&&e.button>0)) return;
+  e.preventDefault();
+  dragState={li:li, list:list, cat:cat, before:listIds(list), pid:e.pointerId};
+  li.classList.add('dragging');
+  document.addEventListener('pointermove', onDragMove, {passive:false});
+  document.addEventListener('pointerup', endDrag);
+  document.addEventListener('pointercancel', endDrag);
+}
+function onDragMove(e){
+  var ds=dragState; if(!ds||e.pointerId!==ds.pid) return;
+  e.preventDefault();
+  var y=e.clientY;
+  for(var guard=0; guard<60; guard++){
+    var p=sibLi(ds.li,-1), n=sibLi(ds.li,1), r;
+    if(p){ r=p.getBoundingClientRect(); if(y<r.top+r.height/2){ ds.list.insertBefore(p, ds.li.nextSibling); continue; } }
+    if(n){ r=n.getBoundingClientRect(); if(y>r.top+r.height/2){ ds.list.insertBefore(n, ds.li); continue; } }
+    break;
+  }
+  // 拖到屏幕上下边就自动滚
+  if(y<140) window.scrollBy(0,-14); else if(y>window.innerHeight-90) window.scrollBy(0,14);
+}
+function endDrag(e){
+  var ds=dragState; if(!ds||(e&&e.pointerId!==ds.pid)) return;
+  dragState=null; ds.li.classList.remove('dragging');
+  document.removeEventListener('pointermove', onDragMove, {passive:false});
+  document.removeEventListener('pointerup', endDrag);
+  document.removeEventListener('pointercancel', endDrag);
+  var after=listIds(ds.list);
+  if(after.join()!==ds.before.join()) act(api('/api/dishes/reorder',{method:'POST',json:{cat:ds.cat,ids:after}}),'顺序记住了');
+  else if(renderPending) render();
 }
 ['dinner','breakfast'].forEach(function(k){ $(k==='dinner'?'foldDinner':'foldBreakfast').onclick=function(){ menuFold[k]=!menuFold[k]; store('bf_fold_'+k, menuFold[k]?'1':null); renderRecipes(); }; });
 function saveIngredients(d, items){ return act(api('/api/dishes/'+d.id+'/update',{method:'POST',json:{ingredients:items}}),'食材记住了'); }
@@ -835,8 +925,8 @@ function recipeAction(a, d, el, li){
   if(a==='ingadd'){ var v=li.querySelector('#ingInput').value; var add=parseList(v); if(!add.length) return; saveIngredients(d, ing.concat(add.filter(function(y){ return ing.indexOf(y)<0; }))); return; }
   if(a==='ingvoice'){ voiceCapture({btn:el,status:li.querySelector('#ingStatus'),input:li.querySelector('#ingInput'),onText:function(t){ var add=parseList(t); if(!add.length){ li.querySelector('#ingStatus').textContent='没听出食材，再说一次'; return; } saveIngredients(d, ing.concat(add.filter(function(y){ return ing.indexOf(y)<0; }))); }}); return; }
   if(a==='ai'){ li.querySelector('#ingStatus').textContent='AI 正在想…'; api('/api/ingredients',{method:'POST',json:{name:d.name}}).then(function(r){ var items=(r.items||[]).filter(function(y){ return ing.indexOf(y)<0; }); if(!items.length){ li.querySelector('#ingStatus').textContent='AI 没给出新的食材'; return; } return saveIngredients(d, ing.concat(items)); }).catch(function(e){ li.querySelector('#ingStatus').textContent=e.message||'AI 出错了'; }); return; }
-  if(a==='mom'){ act(api('/api/dishes/'+d.id+'/update',{method:'POST',json:{mom:!d.mom}}), d.mom?'取消拿手菜':'设为拿手菜了'); return; }
-  if(a==='up'||a==='down'){ act(api('/api/dishes/'+d.id+'/move',{method:'POST',json:{direction:a}})); return; }
+  if(a==='mom'){ act(api('/api/dishes/'+d.id+'/update',{method:'POST',json:{mom:!d.mom}}), d.mom?'取消拿手菜了':'设为拿手菜了：点菜页会排在前面'); return; }
+  if(a==='up'||a==='down'){ var l=menuOrder(dishesOf(d.cat)).map(function(x){ return x.id; }), k=l.indexOf(d.id), j=a==='up'?k-1:k+1; if(k<0||j<0||j>=l.length) return; l[k]=l[j]; l[j]=d.id; act(api('/api/dishes/reorder',{method:'POST',json:{cat:d.cat,ids:l}})); return; }
   if(a==='del'){ if(pendingDelete!==d.id){ pendingDelete=d.id; renderRecipes(); setTimeout(function(){ if(pendingDelete===d.id){ pendingDelete=null; renderRecipes(); } },4000); return; } pendingDelete=null; expandedId=null; act(api('/api/dishes/'+d.id,{method:'DELETE'}),'删掉了'); return; }
 }
 function shrink(file){
@@ -878,6 +968,7 @@ function showView(v){
 }
 function buildNav(){
   var nav=$('nav'), views=NAV[role]||VIEWS;
+  nav.classList.toggle('four', views.length>=4);
   nav.innerHTML=views.map(function(v){ return '<button type="button" data-view="'+v+'">'+VIEW_NAMES[v]+'<span class="badge" hidden></span></button>'; }).join('');
   Array.prototype.forEach.call(nav.querySelectorAll('button'), function(b){ b.onclick=function(){ showView(b.getAttribute('data-view')); }; });
 }
