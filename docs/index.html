@@ -46,6 +46,11 @@ header{text-align:center;padding:10px 0 2px;position:relative}
 .sg{margin:0 0 10px}
 .sg .sgl{display:block;font-size:18px;color:var(--muted);font-weight:700;margin:0 0 6px}
 .hb{color:#b3261e;font-weight:800;white-space:nowrap}
+.hbmsg{display:inline-block;margin-left:4px;padding:1px 8px;border-radius:999px;background:#fde4e1;color:#b3261e;font-size:.8em;font-weight:700;white-space:nowrap;vertical-align:middle}
+.sheet h4.hbh{font-size:20px;color:var(--muted);margin:14px 0 8px}
+.push-card{background:var(--paper);border:4px solid var(--accent-deep);border-radius:24px;padding:14px;margin-bottom:14px}
+.push-card h3{font-size:24px;margin:0 0 6px}
+.push-card p{font-size:20px;color:var(--muted);margin:0 0 10px;line-height:1.4}
 .wish .n small{display:block;font-size:17px;color:var(--muted);font-weight:400}
 .wish .x.go{border-color:var(--accent-deep);background:var(--accent);color:var(--fg);font-weight:700;font-size:20px;padding:10px 14px}
 .wish .x.red{border-color:#b3261e;color:#b3261e;font-weight:700}
@@ -231,6 +236,7 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
 
 <!-- 妈妈：今天 -->
 <section id="view-today" class="view">
+  <div id="pushCard" class="push-card" hidden></div>
   <button type="button" id="btnSpeak" class="big-btn">🔊 读给我听</button>
   <div id="todayBody">
   <h2 class="sec" id="bfSec">早饭 <small id="bfDate"></small></h2>
@@ -364,6 +370,10 @@ function nightLabel(date){ var t=today(); return date===t?'今晚':date===addDay
 function nightFull(date){ var l=nightLabel(date), w=weekday(date); return l.indexOf(w)===0?l:l+' '+w; }
 // 红包：只是记一笔心意，钱自己在微信里发
 function hbText(n){ return n?'🧧'+HB_UNIT+n:''; }
+// 红包旁边带一句给妈妈的话；没写的就是「谢谢妈妈」
+var HB_MSGS=['谢谢妈妈','辛苦妈妈','妈妈做的最好吃','想吃妈妈做的'];
+function hbHtml(n,msg){ return n?'<span class="hb">'+hbText(n)+'</span><span class="hbmsg">'+esc(msg||HB_MSGS[0])+'</span>':''; }
+function hbMsgOf(dishId){ var l=state.wishes||[]; for(var i=0;i<l.length;i++){ var w=l[i]; if(w.dishId===dishId&&w.status!=='done'&&w.hb) return w.hbMsg||''; } return ''; }
 function hbTotal(dishId){ var n=0; (state.wishes||[]).forEach(function(w){ if(w.dishId===dishId&&w.status!=='done'&&w.hb) n+=w.hb; }); return n; }
 function dishById(id){ var l=state.dishes||[]; for(var i=0;i<l.length;i++) if(l[i].id===id) return l[i]; return null; }
 function dishesOf(cat){ return (state.dishes||[]).filter(function(d){ return d.cat===cat; }); }
@@ -486,7 +496,7 @@ function render(){
   renderPending=false;
   $('dateLine').textContent=dateLabel(today()).replace('今天 ','');
   renderMorning(); renderDinner(); renderOrder(); renderBreakfast(); renderShop(); renderRecipes();
-  updateNavBadge(); renderHbBox(); renderWho();
+  updateNavBadge(); renderHbBox(); renderWho(); renderPushCard();
   if(role){ $('btnProfile').hidden=false; $('btnProfile').innerHTML=av(role); }
   $('btnOrderSuggest').hidden=!state.ai; $('btnMenuSuggest').hidden=!state.ai;
 }
@@ -539,13 +549,13 @@ function renderDinner(){
   var n=0, lines=[];
   var rows=MEMBERS.map(function(who){
     var st=dinnerStatus(plan,who); if(st.k==='yes') n++;
-    var ws=openWishesOf(who).map(function(w){ var d=dishById(w.dishId); return d?{n:d.name,hb:w.hb||0}:null; }).filter(Boolean);
+    var ws=openWishesOf(who).map(function(w){ var d=dishById(w.dishId); return d?{n:d.name,hb:w.hb||0,m:w.hbMsg||''}:null; }).filter(Boolean);
     lines.push(PEOPLE[who].name+st.t+(ws.length?'，想吃'+ws.map(function(x){ return x.n; }).join('、'):''));
-    return '<div class="person"><span class="who">'+av(who)+' '+esc(PEOPLE[who].name)+'</span><span class="st '+st.k+'">'+st.t+'</span><span class="pw">'+(ws.length?'想吃 '+ws.map(function(x){ return esc(x.n)+(x.hb?' <span class="hb">'+hbText(x.hb)+'</span>':''); }).join('、'):'')+'</span></div>';
+    return '<div class="person"><span class="who">'+av(who)+' '+esc(PEOPLE[who].name)+'</span><span class="st '+st.k+'">'+st.t+'</span><span class="pw">'+(ws.length?'想吃 '+ws.map(function(x){ return esc(x.n)+(x.hb?' '+hbHtml(x.hb,x.m):''); }).join('、'):'')+'</span></div>';
   }).join('');
   $('dinnerBoard').innerHTML='<p class="count">'+(loaded?('回来吃的：'+n+' 人'):'…')+'<small>不算妈妈。下午 5 点还没说的算回来吃</small></p>'+rows;
   var cn=cookNames(plan);
-  var forWho=[], forHb=0; if(plan.cook){ (plan.cook.dishIds||[]).forEach(function(id){ (state.wishes||[]).forEach(function(w){ if(w.dishId===id&&w.status!=='done'){ if(forWho.indexOf(PEOPLE[w.who].name)<0) forWho.push(PEOPLE[w.who].name); forHb+=w.hb||0; } }); }); }
+  var forWho=[], forHb=0, forMsg=''; if(plan.cook){ (plan.cook.dishIds||[]).forEach(function(id){ (state.wishes||[]).forEach(function(w){ if(w.dishId===id&&w.status!=='done'){ if(forWho.indexOf(PEOPLE[w.who].name)<0) forWho.push(PEOPLE[w.who].name); forHb+=w.hb||0; if(w.hb&&!forMsg) forMsg=w.hbMsg||''; } }); }); }
   function materials(){
     if(!plan.cook) return '';
     var ds=(plan.cook.dishIds||[]).map(dishById).filter(Boolean), miss=[], noIng=[];
@@ -560,7 +570,7 @@ function renderDinner(){
   }
   $('cookCard').innerHTML='<div class="lab">'+esc(nightFull(d0))+' 做</div>'
     +'<div class="txt'+(cn?'':' none')+'">'+(cn?esc(cn):isUnsure(plan)?'还没想好，想好了再定':'还没定')+'</div>'
-    +(forWho.length?'<div class="for">'+esc(forWho.join('和'))+'想吃的 ✓'+(forHb?' <span class="hb">'+hbText(forHb)+'</span>':'')+'</div>':'')
+    +(forWho.length?'<div class="for">'+esc(forWho.join('和'))+'想吃的 ✓'+(forHb?' '+hbHtml(forHb,forMsg):'')+'</div>':'')
     +materials()
     +'<button type="button" class="big-btn'+(cn?' ghost':' primary')+'" data-date="'+d0+'" style="width:100%">'+(cn?'换一个':'定'+lab0+'做什么')+'</button>'
     +dayRow(days[1])+dayRow(days[2]);
@@ -574,7 +584,7 @@ function renderHbBox(){
   var box=$('hbBox'), l=(state.wishes||[]).filter(function(w){ return w.hb&&w.status==='done'&&PEOPLE[w.who]; });
   if(role!=='mom'||!l.length){ box.hidden=true; return; }
   box.hidden=false;
-  box.innerHTML='<h3>🧧 谢谢妈妈的红包</h3>'+l.map(function(w){ var d=dishById(w.dishId); return '<div class="person"><span class="who">'+av(w.who)+' '+esc(PEOPLE[w.who].name)+'</span><span class="pw">'+esc(d?d.name:'菜')+' <span class="hb">'+hbText(w.hb)+'</span></span><span class="st '+(w.hbPaid?'yes':'maybe')+'">'+(w.hbPaid?'已发':'还没发')+'</span></div>'; }).join('');
+  box.innerHTML='<h3>🧧 谢谢妈妈的红包</h3>'+l.map(function(w){ var d=dishById(w.dishId); return '<div class="person"><span class="who">'+av(w.who)+' '+esc(PEOPLE[w.who].name)+'</span><span class="pw">'+esc(d?d.name:'菜')+' '+hbHtml(w.hb,w.hbMsg)+'</span><span class="st '+(w.hbPaid?'yes':'maybe')+'">'+(w.hbPaid?'已发':'还没发')+'</span></div>'; }).join('');
 }
 function planByDate(date){ var ds=planDays(); for(var i=0;i<ds.length;i++) if(ds[i].date===date) return ds[i]; return null; }
 function openChooser(date){ var plan=planByDate(date); chooser={date:date, sel:(plan&&plan.cook?plan.cook.dishIds.slice():[]), text:(plan&&plan.cook&&!isUnsure(plan)?plan.cook.text:'')}; renderChooser(); setTimeout(function(){ $('chooser').scrollIntoView({behavior:'smooth',block:'start'}); },50); }
@@ -583,11 +593,11 @@ function renderChooser(){
   var date=chooser.date, label=nightLabel(date);
   var dinnerDishes=dishesOf('dinner');
   var wishIds=[]; var wishMeta={};
-  (state.wishes||[]).forEach(function(w){ if(w.status==='done'||!PEOPLE[w.who]) return; if(wishIds.indexOf(w.dishId)<0) wishIds.push(w.dishId); var m=wishMeta[w.dishId]||(wishMeta[w.dishId]={who:[],days:0,hb:0}); if(m.who.indexOf(PEOPLE[w.who].name)<0) m.who.push(PEOPLE[w.who].name); m.days=Math.max(m.days,daysSince(w.at)); m.hb+=w.hb||0; });
+  (state.wishes||[]).forEach(function(w){ if(w.status==='done'||!PEOPLE[w.who]) return; if(wishIds.indexOf(w.dishId)<0) wishIds.push(w.dishId); var m=wishMeta[w.dishId]||(wishMeta[w.dishId]={who:[],days:0,hb:0,msg:''}); if(m.who.indexOf(PEOPLE[w.who].name)<0) m.who.push(PEOPLE[w.who].name); m.days=Math.max(m.days,daysSince(w.at)); m.hb+=w.hb||0; if(w.hb&&!m.msg) m.msg=w.hbMsg||''; });
   // 红包多的排前面，其次等得久的
   wishIds.sort(function(a,b){ return (wishMeta[b].hb-wishMeta[a].hb)||(wishMeta[b].days-wishMeta[a].days); });
-  function chip(d, meta, hb){ var on=chooser.sel.indexOf(d.id)>=0; return '<button type="button" data-id="'+d.id+'" class="'+(on?'on':'')+'"><span class="cn">'+esc(d.emoji||'')+' '+esc(d.name)+'</span>'+(hb?'<span class="hb">'+hbText(hb)+'</span>':'')+(meta?'<small>'+esc(meta)+'</small>':'')+'</button>'; }
-  var wishChips=wishIds.map(dishById).filter(Boolean).map(function(d){ var m=wishMeta[d.id]; return chip(d, m.who.join('、')+'想吃'+(m.days?'，等了'+m.days+'天':''), m.hb); }).join('');
+  function chip(d, meta, hb, msg){ var on=chooser.sel.indexOf(d.id)>=0; return '<button type="button" data-id="'+d.id+'" class="'+(on?'on':'')+'"><span class="cn">'+esc(d.emoji||'')+' '+esc(d.name)+'</span>'+(hb?hbHtml(hb,msg):'')+(meta?'<small>'+esc(meta)+'</small>':'')+'</button>'; }
+  var wishChips=wishIds.map(dishById).filter(Boolean).map(function(d){ var m=wishMeta[d.id]; return chip(d, m.who.join('、')+'想吃'+(m.days?'，等了'+m.days+'天':''), m.hb, m.msg); }).join('');
   var momChips=dinnerDishes.filter(function(d){ return d.mom && wishIds.indexOf(d.id)<0; }).map(function(d){ return chip(d, d.lastMade?'上次 '+d.lastMade.slice(5).replace('-','/'):''); }).join('');
   var otherChips=dinnerDishes.filter(function(d){ return !d.mom && wishIds.indexOf(d.id)<0; }).map(function(d){ return chip(d,''); }).join('');
   box.innerHTML='<h3>'+esc(nightFull(date))+' 做什么？点一个或几个</h3>'
@@ -632,7 +642,7 @@ function renderOrder(){
   var grid=$('orderGrid');
   if(!loaded) grid.innerHTML='<div class="empty">正在打开…</div>';
   else if(!list.length) grid.innerHTML='<div class="empty">菜单里还没有正餐，先在下面说一道想吃的</div>';
-  else grid.innerHTML=list.map(function(d){ var w=mine[d.id], hb=hbTotal(d.id); var meta=w&&w.status==='planned'&&w.plannedFor?'妈妈安排在'+nightLabel(w.plannedFor):(d.mom?'⭐ 妈妈的拿手菜':''); return '<button type="button" class="card'+(w?' selected':'')+'" data-id="'+d.id+'" aria-pressed="'+(w?'true':'false')+'">'+picHtml(d)+'<div class="name">'+esc(d.name)+'</div>'+(w?'<div class="tick">✓ 已点</div>':'')+(hb?'<div class="meta"><span class="hb">'+hbText(hb)+'</span></div>':'')+(meta?'<div class="meta">'+esc(meta)+'</div>':'')+'</button>'; }).join('');
+  else grid.innerHTML=list.map(function(d){ var w=mine[d.id], hb=hbTotal(d.id); var meta=w&&w.status==='planned'&&w.plannedFor?'妈妈安排在'+nightLabel(w.plannedFor):(d.mom?'⭐ 妈妈的拿手菜':''); return '<button type="button" class="card'+(w?' selected':'')+'" data-id="'+d.id+'" aria-pressed="'+(w?'true':'false')+'">'+picHtml(d)+'<div class="name">'+esc(d.name)+'</div>'+(w?'<div class="tick">✓ 已点</div>':'')+(hb?'<div class="meta">'+hbHtml(hb,hbMsgOf(d.id))+'</div>':'')+(meta?'<div class="meta">'+esc(meta)+'</div>':'')+'</button>'; }).join('');
   Array.prototype.forEach.call(grid.querySelectorAll('.card'), function(el){ el.onclick=function(){ var id=Number(el.getAttribute('data-id')), w=mine[id], d=dishById(id); if(w) act(api('/api/wishes/'+w.id+'/remove',{method:'POST'}),'取消了'); else orderWish({who:role,dishId:id}, d?d.name:''); }; });
   // 心愿单：没做的在前，红包多的在前
   var ws=(state.wishes||[]).filter(function(w){ return PEOPLE[w.who]&&dishById(w.dishId); }).sort(function(a,b){ return ((a.status==='done'?1:0)-(b.status==='done'?1:0)) || ((b.hb||0)-(a.hb||0)) || (a.at<b.at?1:-1); });
@@ -641,7 +651,7 @@ function renderOrder(){
     var btns='';
     if(me&&!done) btns='<button type="button" class="x red" data-hb="'+w.id+'">'+(w.hb?'改红包':'🧧 包红包')+'</button><button type="button" class="x" data-wid="'+w.id+'">取消</button>';
     else if(me&&done&&w.hb&&!w.hbPaid) btns='<button type="button" class="x go" data-paid="'+w.id+'">红包发了 ✓</button>';
-    return '<div class="wish'+(done&&!(me&&w.hb&&!w.hbPaid)?' done':'')+'"><span class="n">'+esc(d.emoji||'')+' '+esc(d.name)+(w.hb?' <span class="hb">'+hbText(w.hb)+'</span>':'')+(me&&done&&w.hb&&!w.hbPaid?'<small>妈妈做了，记得在微信给妈妈发红包</small>':done&&w.hb&&w.hbPaid?'<small>红包已发</small>':'')+'</span><span class="w">'+av(w.who)+' '+esc(PEOPLE[w.who].name)+' · '+st+'</span>'+btns+'</div>'; }).join('')
+    return '<div class="wish'+(done&&!(me&&w.hb&&!w.hbPaid)?' done':'')+'"><span class="n">'+esc(d.emoji||'')+' '+esc(d.name)+(w.hb?' '+hbHtml(w.hb,w.hbMsg):'')+(me&&done&&w.hb&&!w.hbPaid?'<small>妈妈做了，记得在微信给妈妈发红包</small>':done&&w.hb&&w.hbPaid?'<small>红包已发</small>':'')+'</span><span class="w">'+av(w.who)+' '+esc(PEOPLE[w.who].name)+' · '+st+'</span>'+btns+'</div>'; }).join('')
     :'<p class="note">还没人点菜</p>';
   Array.prototype.forEach.call($('wishList').querySelectorAll('button'), function(b){ b.onclick=function(){
     if(b.getAttribute('data-hb')) openHb(Number(b.getAttribute('data-hb')));
@@ -659,15 +669,26 @@ function orderWish(json, name){
 function wishById(id){ var l=state.wishes||[]; for(var i=0;i<l.length;i++) if(l[i].id===id) return l[i]; return null; }
 function openHb(wishId){
   var w=wishById(wishId); if(!w) return; var d=dishById(w.dishId);
-  openSheet('<h3>🧧 给妈妈包个红包？</h3><p class="hint" style="text-align:left;margin:0 0 12px">'+esc(d?d.name:'这道菜')+'：鼓励妈妈做这道菜，做好了谢谢她'+(w.hb?'。现在是 '+hbText(w.hb):'')+'</p>'
-    +'<div class="chips big">'+HB_AMOUNTS.map(function(a){ return '<button type="button" data-a="'+a+'" class="'+(w.hb===a?'on':'')+'">'+hbText(a)+'</button>'; }).join('')+'</div>'
-    +'<div class="add-row" style="margin-top:12px"><input id="hbInput" type="number" inputmode="numeric" min="1" max="9999" placeholder="别的金额"><button type="button" class="big-btn" id="hbOk">确定</button></div>'
-    +'<p class="note" style="text-align:left">这里只是记一笔，钱要自己在微信里发给妈妈</p>'
-    +'<button type="button" class="big-btn ghost" id="hbNone" style="width:100%">'+(w.hb?'不包了':'这次不用')+'</button>');
-  function set(n){ closeSheet(); if(!n&&!w.hb) return; act(api('/api/wishes/'+wishId+'/update',{method:'POST',json:{hb:n}}), n?'红包记上了 '+hbText(n):'红包取消了'); }
-  Array.prototype.forEach.call($('sheetBody').querySelectorAll('[data-a]'), function(b){ b.onclick=function(){ set(Number(b.getAttribute('data-a'))); }; });
-  $('hbOk').onclick=function(){ var n=Math.round(Number($('hbInput').value)); if(!(n>0)){ toast('先填金额'); return; } set(n); };
-  $('hbNone').onclick=function(){ set(0); };
+  var sel={n:w.hb||0, m:w.hbMsg||HB_MSGS[0]}, ownN=sel.n&&HB_AMOUNTS.indexOf(sel.n)<0, ownM=HB_MSGS.indexOf(sel.m)<0;
+  openSheet('<h3>🧧 给妈妈包个红包？</h3><p class="hint" style="text-align:left;margin:0 0 4px">'+esc(d?d.name:'这道菜')+'：鼓励妈妈做这道菜，做好了谢谢她</p>'
+    +'<h4 class="hbh">包多少</h4><div class="chips big" id="hbAmts">'+HB_AMOUNTS.map(function(a){ return '<button type="button" data-a="'+a+'" class="'+(sel.n===a?'on':'')+'">'+hbText(a)+'</button>'; }).join('')+'</div>'
+    +'<div class="add-row" style="margin-top:10px"><input id="hbInput" type="number" inputmode="numeric" min="1" max="9999" placeholder="别的金额" value="'+(ownN?sel.n:'')+'"></div>'
+    +'<h4 class="hbh">跟妈妈说句话</h4><div class="chips" id="hbMsgs">'+HB_MSGS.map(function(x){ return '<button type="button" data-m="'+esc(x)+'" class="'+(!ownM&&sel.m===x?'on':'')+'">'+esc(x)+'</button>'; }).join('')+'</div>'
+    +'<div class="add-row" style="margin-top:10px"><input id="hbMsgInput" maxlength="20" placeholder="或者自己写一句" autocomplete="off" value="'+(ownM?esc(sel.m):'')+'"></div>'
+    +'<p class="note" style="text-align:left">这里只是记一笔，钱要自己在微信里发给妈妈。包好了妈妈那边会看到这句话</p>'
+    +'<button type="button" class="big-btn primary" id="hbOk" style="width:100%">包好了</button>'
+    +'<button type="button" class="big-btn ghost" id="hbNone" style="width:100%;margin-top:8px">'+(w.hb?'不包了':'这次不用')+'</button>');
+  function mark(boxId, attr, val){ Array.prototype.forEach.call($(boxId).querySelectorAll('button'), function(b){ b.classList.toggle('on', b.getAttribute(attr)===String(val)); }); }
+  Array.prototype.forEach.call($('hbAmts').querySelectorAll('button'), function(b){ b.onclick=function(){ sel.n=Number(b.getAttribute('data-a')); $('hbInput').value=''; mark('hbAmts','data-a',sel.n); }; });
+  Array.prototype.forEach.call($('hbMsgs').querySelectorAll('button'), function(b){ b.onclick=function(){ sel.m=b.getAttribute('data-m'); $('hbMsgInput').value=''; mark('hbMsgs','data-m',sel.m); }; });
+  $('hbInput').oninput=function(){ mark('hbAmts','data-a',''); };
+  $('hbMsgInput').oninput=function(){ mark('hbMsgs','data-m',''); };
+  $('hbOk').onclick=function(){
+    var own=Math.round(Number($('hbInput').value)), n=own>0?Math.min(own,9999):sel.n, m=$('hbMsgInput').value.trim().slice(0,20)||sel.m;
+    if(!(n>0)){ toast('先选包多少'); return; }
+    closeSheet(); act(api('/api/wishes/'+wishId+'/update',{method:'POST',json:{hb:n,hbMsg:m}}), '红包记上了 '+hbText(n)+' '+m);
+  };
+  $('hbNone').onclick=function(){ closeSheet(); if(!w.hb) return; act(api('/api/wishes/'+wishId+'/update',{method:'POST',json:{hb:0}}),'红包取消了'); };
 }
 $('otherForm').onsubmit=function(e){ e.preventDefault(); var v=cleanName($('otherInput').value)||$('otherInput').value.trim(); if(!v) return; $('otherInput').value=''; $('otherInput').blur(); orderWish({who:role,name:v}, v); };
 $('btnOtherVoice').onclick=function(){ voiceCapture({btn:$('btnOtherVoice'),status:$('otherStatus'),input:$('otherInput'),onText:function(t){ var v=cleanName(t); if(v){ $('otherInput').value=''; orderWish({who:role,name:v}, v); } }}); };
@@ -709,12 +730,12 @@ function renderBreakfast(){
   if(!loaded) grid.innerHTML='<div class="empty">正在打开…</div>';
   else if(!list.length) grid.innerHTML='<div class="empty">菜单里还没有早饭，到「菜谱本」加</div>';
   else { var selIds=pickedIds(cur); grid.innerHTML=list.map(function(d){ var sel=selIds.indexOf(d.id)>=0; return '<button type="button" class="card'+(sel?' selected':'')+'" data-id="'+d.id+'" aria-pressed="'+(sel?'true':'false')+'">'+picHtml(d)+'<div class="name">'+esc(d.name)+'</div>'+(sel?'<div class="tick">✓ 就吃这个</div>':'')+'</button>'; }).join(''); }
-  Array.prototype.forEach.call(grid.querySelectorAll('.card'), function(el){ el.onclick=function(){ var ids=pickedIds(cur), id=Number(el.getAttribute('data-id')), k=ids.indexOf(id); if(k>=0) ids.splice(k,1); else ids.push(id); act(api('/api/pick',{method:'POST',json:{type:'dishes',ids:ids,date:td}})).then(function(r){ if(r) toast(r.pick?'选好了：'+r.pick.resolvedName:'取消了'); }); }; });
+  Array.prototype.forEach.call(grid.querySelectorAll('.card'), function(el){ el.onclick=function(){ var ids=pickedIds(cur), id=Number(el.getAttribute('data-id')), k=ids.indexOf(id); if(k>=0) ids.splice(k,1); else ids.push(id); act(api('/api/pick',{method:'POST',json:{type:'dishes',ids:ids,date:td,who:role}})).then(function(r){ if(r) toast(r.pick?'选好了：'+r.pick.resolvedName:'取消了'); }); }; });
   $('pickStatus').textContent=cur?(cur.type==='skip'?'已选好：不吃':'已选好：'+cur.resolvedName+(cur.auto?'（自动随机的）':cur.type==='random'?'（随便选的）':'')):(loaded?'还没选，不选就是'+FALLBACK_NAME:'');
   $('btnRandom').disabled=!list.length;
 }
-$('btnRandom').onclick=function(){ act(api('/api/pick',{method:'POST',json:{type:'random',date:targetDate()}})).then(function(r){ if(r&&r.pick) toast('随便选了：'+r.pick.resolvedName); }); };
-$('btnSkip').onclick=function(){ act(api('/api/pick',{method:'POST',json:{type:'skip',date:targetDate()}}),'好，早饭不吃'); };
+$('btnRandom').onclick=function(){ act(api('/api/pick',{method:'POST',json:{type:'random',date:targetDate(),who:role}})).then(function(r){ if(r&&r.pick) toast('随便选了：'+r.pick.resolvedName); }); };
+$('btnSkip').onclick=function(){ act(api('/api/pick',{method:'POST',json:{type:'skip',date:targetDate(),who:role}}),'好，早饭不吃'); };
 
 // 买菜（全家）
 // 买菜默认按晚饭来：只看三天里定好的晚饭（早饭不算）
@@ -837,7 +858,7 @@ function dishRow(d, i, n){
   var hb=hbTotal(d.id);
   var meta=(d.ingredients&&d.ingredients.length?'食材 '+d.ingredients.length+' 样':'还没填食材')+(d.cat==='dinner'?(d.lastMade?' · 上次 '+d.lastMade.slice(5).replace('-','/'):' · 没做过')+(d.times?' · 做过 '+d.times+' 次':''):'');
   var html='<li data-id="'+d.id+'"><div class="top"><span class="drag" data-drag="1" role="button" aria-label="按住上下拖，排顺序">☰</span><div class="thumb">'+esc(d.emoji||'🍽️')+(d.image?'<img src="'+esc(d.image)+'" alt="" onload="this.className=\'ok\'" onerror="this.remove()">':'')+'</div>'
-    +'<span class="mname">'+(d.mom&&d.cat==='dinner'?'⭐ ':'')+esc(d.name)+(hb?' <span class="hb">'+hbText(hb)+'</span>':'')+'<small>'+esc(meta)+'</small></span>'
+    +'<span class="mname">'+(d.mom&&d.cat==='dinner'?'⭐ ':'')+esc(d.name)+(hb?' '+hbHtml(hb,hbMsgOf(d.id)):'')+'<small>'+esc(meta)+'</small></span>'
     +'<button type="button" class="open" data-act="toggle">'+(open?'收起':'详情')+'</button></div>';
   if(open){
     var ing=(d.ingredients||[]);
@@ -994,6 +1015,7 @@ $('sheet').onclick=function(e){ if(e.target===$('sheet')) closeSheet(); };
 function openProfile(focusFeedback){
   openSheet('<div style="text-align:center">'+av(role,'xl')+'<div style="font-size:30px;font-weight:800;margin:8px 0 12px">'+esc(PEOPLE[role].name)+'</div>'
     +'<label class="big-btn" style="display:inline-block;cursor:pointer">📷 换头像<input type="file" accept="image/*" id="avFile" style="position:absolute;width:1px;height:1px;opacity:0"></label><p class="note" id="avStatus"></p></div>'
+    +(role==='mom'?'<h3 style="margin-top:14px">🔔 手机通知</h3><p class="note" style="text-align:left;margin:0 0 8px" id="pushSheetNote">'+esc(pushNote())+'</p><div class="row" id="pushSheetBtns"></div>':'')
     +'<h3 style="margin-top:14px">💬 提意见</h3><p class="note" style="text-align:left;margin:0 0 8px">哪里不好用、想加什么，说一句就行</p>'
     +'<div class="add-row"><input id="fbInput" placeholder="说一句或打字" autocomplete="off"><button type="button" id="fbVoice" class="mic">🎤</button></div><p class="note" id="fbStatus" style="text-align:left"></p>'
     +'<button type="button" class="big-btn primary" id="fbSend" style="width:100%">发送意见</button>'
@@ -1004,8 +1026,76 @@ function openProfile(focusFeedback){
   $('fbSend').onclick=function(){ var t=$('fbInput').value.trim(); if(!t){ $('fbStatus').textContent='先说一句或打几个字'; return; } $('fbSend').disabled=true; api('/api/feedback',{method:'POST',json:{who:role,text:t}}).then(function(){ closeSheet(); toast('收到了，谢谢！'); }).catch(function(e){ $('fbSend').disabled=false; $('fbStatus').textContent=e.message||'没发出去，请再试一次'; }); };
   Array.prototype.forEach.call($('sheetBody').querySelectorAll('.who-row button'), function(b){ b.onclick=function(){ var r=b.getAttribute('data-role'); closeSheet(); if(r===role) return; store('bf_role', r); chooser=null; applyRole(r); toast('现在是'+PEOPLE[r].name); }; });
   $('sheetClose').onclick=closeSheet;
+  if(role==='mom') drawPushSheet();
   if(focusFeedback) setTimeout(function(){ $('fbInput').scrollIntoView({block:'center'}); },50);
 }
+// ---- 手机通知（只给妈妈）：有人说不回来吃、点菜、选好早饭、包红包时，手机响一下提醒她打开看 ----
+var pushHere=null;   // 这台手机：true 已打开 / false 没打开 / null 还不知道
+function b64uToBytes(s){ var t=s.replace(/-/g,'+').replace(/_/g,'/'); t+='==='.slice((t.length+3)%4); var bin=atob(t), out=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i); return out; }
+function bytesToB64u(buf){ var b=new Uint8Array(buf), s=''; for(var i=0;i<b.length;i++) s+=String.fromCharCode(b[i]); return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function pushSupport(){
+  if(inWeChat) return 'wechat';
+  var ios=/iP(hone|ad|od)/.test(navigator.userAgent), home=window.navigator.standalone===true||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)) return ios&&!home?'need-home':'no';
+  if(Notification.permission==='denied') return 'denied';
+  return 'ok';
+}
+function pushNote(){
+  var s=pushSupport();
+  if(s==='wechat') return '微信里收不到通知。点右上角「…」→「在浏览器打开」，再加到主屏幕';
+  if(s==='need-home') return 'iPhone 要先把「吃什么」加到主屏幕（Safari 底部「分享」→「添加到主屏幕」），从桌面图标打开，才能收通知';
+  if(s==='no') return '这个浏览器收不了通知，换 Chrome 或 Safari 试试';
+  if(s==='denied') return '通知被关掉了。要在手机的「设置」里找到「吃什么」（或浏览器），允许通知';
+  if(pushHere) return '已经打开了：有人说不回来吃、点菜、选好早饭、包红包时，手机会提醒你';
+  return '打开以后，有人说不回来吃、点菜、选好早饭、包红包时，手机会响一下提醒你打开看';
+}
+function checkPushHere(){
+  if(role!=='mom'||pushSupport()!=='ok'||!state.pushKey) return;
+  navigator.serviceWorker.getRegistration().then(function(reg){ return reg?reg.pushManager.getSubscription():null; }).then(function(sub){
+    var on=!!(sub&&sub.options&&sub.options.applicationServerKey&&bytesToB64u(sub.options.applicationServerKey)===state.pushKey);
+    if(on!==pushHere){ pushHere=on; renderPushCard(); }
+  }).catch(function(){});
+}
+function enablePush(){
+  // 先要权限（必须在点按钮的这一下里要），再订阅，再告诉后端，最后发一条试试
+  if(!state.pushKey){ toast('还没连上，稍等再点'); return Promise.resolve(); }
+  var perm=Notification.requestPermission();
+  return Promise.resolve(perm).then(function(p){
+    if(p!=='granted') throw new Error(p==='denied'?'没有允许通知。要在手机设置里允许「吃什么」发通知':'还没允许通知');
+    return navigator.serviceWorker.register('sw.js').then(function(){ return navigator.serviceWorker.ready; });
+  }).then(function(reg){
+    return reg.pushManager.getSubscription().then(function(old){
+      if(old&&!(old.options&&old.options.applicationServerKey&&bytesToB64u(old.options.applicationServerKey)===state.pushKey)) return old.unsubscribe().then(function(){ return null; });
+      return old;
+    }).then(function(old){ return old||reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64uToBytes(state.pushKey)}); });
+  }).then(function(sub){ return api('/api/push/subscribe',{method:'POST',json:{who:role,key:state.pushKey,sub:sub.toJSON()}}); })
+    .then(function(){ pushHere=true; store('bf_push_later',null); renderPushCard(); toast('通知打开了，马上会收到一条试试'); return api('/api/push/test',{method:'POST',json:{who:role}}).catch(function(){}); })
+    .catch(function(e){ var m=(e&&e.message)||''; toast(/[\u4e00-\u9fff]/.test(m)?m:'通知没打开成功，请再试一次'+(m?'（'+m+'）':'')); });
+}
+function disablePush(){
+  return navigator.serviceWorker.getRegistration().then(function(reg){ return reg?reg.pushManager.getSubscription():null; }).then(function(sub){
+    if(!sub) return; var ep=sub.endpoint; return sub.unsubscribe().then(function(){ return api('/api/push/unsubscribe',{method:'POST',json:{who:role,endpoint:ep}}); });
+  }).then(function(){ pushHere=false; renderPushCard(); toast('通知关掉了'); }).catch(function(){ toast('没关掉，请再试一次'); });
+}
+// 小饭桌顶上的提示卡：这台手机还没打开通知时显示，可以「以后再说」
+function renderPushCard(){
+  var c=$('pushCard'); if(!c) return;
+  var s=role==='mom'?pushSupport():'';
+  if(role!=='mom'||pushHere!==false&&s==='ok'||pushHere||load('bf_push_later')==='1'||s==='no'||!loaded){ c.hidden=true; if(role==='mom'&&pushHere===null) checkPushHere(); return; }
+  c.hidden=false;
+  c.innerHTML='<h3>🔔 打开手机通知？</h3><p>'+esc(pushNote())+'</p><div class="row">'+(s==='ok'?'<button type="button" class="big-btn primary" id="pushOn">打开通知</button>':'')+'<button type="button" class="big-btn ghost" id="pushLater">以后再说</button></div>';
+  if($('pushOn')) $('pushOn').onclick=function(){ enablePush(); };
+  $('pushLater').onclick=function(){ store('bf_push_later','1'); renderPushCard(); toast('想打开时，点右上角头像'); };
+}
+function drawPushSheet(){
+  var box=$('pushSheetBtns'); if(!box) return; var s=pushSupport();
+  $('pushSheetNote').textContent=pushNote();
+  box.innerHTML=s!=='ok'?'':pushHere?'<button type="button" class="big-btn" id="pushTest">发一条试试</button><button type="button" class="big-btn ghost" id="pushOff">关掉通知</button>':'<button type="button" class="big-btn primary" id="pushOn2">打开通知</button>';
+  if($('pushOn2')) $('pushOn2').onclick=function(){ enablePush().then(drawPushSheet); };
+  if($('pushTest')) $('pushTest').onclick=function(){ api('/api/push/test',{method:'POST',json:{who:role}}).then(function(r){ toast(r.ok?'发出去了，看看手机':'没发出去，关掉再打开试试'); }).catch(function(e){ toast(e.message||'没发出去'); }); };
+  if($('pushOff')) $('pushOff').onclick=function(){ disablePush().then(drawPushSheet); };
+}
+
 $('btnProfile').onclick=function(){ openProfile(false); };
 $('btnFeedback').onclick=function(){ openProfile(true); };
 var saved=load('bf_role');
