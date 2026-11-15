@@ -1,0 +1,1 @@
+{ "name": "breakfast-ux-tests", "private": true, "description": "妈妈端可用性测量：本地真实后端 + 手机尺寸浏览器", "devDependencies": { "deno": "2.9.6", "axe-core": "4.10.2" } }

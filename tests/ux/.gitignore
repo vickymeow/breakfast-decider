@@ -1,0 +1,11 @@
+node_modules
+.deno/
+db-*.json
+src-*/
+shots-*/
+*.json.out
+tasks-*.json
+axe-*.json
+!package.json
+!fixture.json
+!import_map.json
