@@ -5,7 +5,7 @@ const AXE = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 const WHEN = process.argv[2] || '2026-11-15T16:30:00-08:00';
 (async () => {
   const all = [];
-  for (const [role, views] of [['mom', ['today', 'shop', 'recipes']], ['kid', ['order']]]) {
+  for (const [role, views] of [['mom', ['today', 'shop', 'recipes']], ['kid', ['days','recipes']]]) {
     const t = await open(role, WHEN);
     for (const v of views) {
       await t.page.click(`#nav button[data-view="${v}"]`); await t.page.waitForTimeout(400);

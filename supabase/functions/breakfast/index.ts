@@ -32,6 +32,10 @@
 //   POST /api/staples     {op:"add", names:[]} | {op:"remove", name}   常买（家里人自己加、自己删）
 //   POST /api/transcribe  （请求体是录音）           Qwen 语音转文字
 //   POST /api/ingredients {name}                      Qwen 给出食材清单
+//   POST /api/intent      {text, prev?, dates:[]}     妈妈说的一句话 → 拆成要做的事（排菜、买东西、做不了、问问题……），网页确认后再执行
+//   POST /api/ideas       {query?, cat, n?, exclude?}  AI 想几道新菜（带要买的和做法）；query 是一类菜，比如「鱼」
+//   POST /api/wishes/:id/decline {reason?}            妈妈说这道菜这次做不了：心愿拿掉，告诉点菜的人
+//   定了做什么菜（dinner/cook、dinner/add）：新排上的菜的食材自动进菜篮子（没食材先让 AI 填）；菜换掉了，它自动加的、还没买的拿掉
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { newVapid, sendPush, type PushSub, type Vapid } from "./push.ts";
 
@@ -39,6 +43,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const supabase = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
+const BUILD = "2026-11-16 妈妈端改版";   // 部署后打开接口地址能看到，确认是不是新版本
 const TABLE = "breakfast_state";
 const BUCKET = "breakfast";
 const ROW_ID = 1;
@@ -72,23 +77,28 @@ type Cat = "breakfast" | "dinner";
 type Dish = {
   id: number; name: string; emoji?: string; image?: string;
   cat: Cat; mom: boolean; ingredients: string[]; lastMade: string | null; times: number; by?: string;
+  steps?: string[];   // 做法，一步一句（AI 想的新菜带着）
 };
 type Pick = { type: "dish" | "random" | "skip"; dish: number | null; dishes?: number[]; resolvedName: string | null; auto?: boolean };
 type Reply = { home: boolean | null; at: string };
-type Plan = { date: string; replies: Record<string, Reply>; cook: { dishIds: number[]; text: string; at: string } | null; done?: boolean };
+// pending：妈妈只说了一类菜（比如「鱼」）还没定怎么做
+type Plan = { date: string; replies: Record<string, Reply>; cook: { dishIds: number[]; text: string; at: string; pending?: string } | null; done?: boolean };
 type Wish = { id: number; dishId: number; who: string; at: string; status: "open" | "planned" | "done"; plannedFor?: string; doneAt?: string; hb?: number; hbMsg?: string; hbPaid?: boolean };
 type Feedback = { id: number; who: string; text: string; at: string; done?: boolean };
 // 红包账本：菜做好了（结算时）心愿上的红包记进来，谁、哪道菜、多少、哪天做的、发了没
 type Ledger = { id: number; wishId: number; who: string; dishId: number; name: string; hb: number; msg?: string; date: string; paidAt?: string };
 // 发过的通知（给谁、谁引起的、内容），网页上「最近的动态」看
 type Inbox = { id: number; to: string; from: string; body: string; at: string };
-type ShopItem = { id: number; name: string; done: boolean; from?: string; at: string; doneAt?: string };
+// auto：定了菜自动加的（dishId 是哪道菜），菜换掉了会自动拿掉；note：数量之类的备注
+type ShopItem = { id: number; name: string; done: boolean; from?: string; at: string; doneAt?: string; auto?: boolean; dishId?: number; note?: string };
 type Db = { v: number; dishes: Dish[]; pick: Pick | null; pickDate: string | null; plans: Record<string, Plan>; wishes: Wish[]; shopping: ShopItem[]; shopHistory: Record<string, number>; profiles: Record<string, { avatar?: string }>; feedback: Feedback[]; orderV?: number; staples?: string[];
   push?: Record<string, (PushSub & { at: string })[]>; vapid?: Vapid; notify?: Record<string, { evs: Ev[]; token: number; at: string }>;
   tz?: string; ledger?: Ledger[]; ledgerV?: number; inbox?: Inbox[]; reminded?: Record<string, string> };
 // 要告诉家里人的动态：先记下来，30 秒内没有新动作再按当时的情况合成一条发出去（点错马上取消的就不发了）
 // 女儿、小陈的动作发给妈妈；妈妈的动作（定了做什么、做好了）发给女儿、小陈
 type Ev = { k: "wish" | "hb" | "paid" | "lpaid" | "away" | "pick" | "cook" | "made" | "plan"; id?: number; date?: string };
+// 一类菜：只说这些词，说明还没想好怎么做
+const CATEGORY_WORDS = ["鱼", "虾", "肉", "猪肉", "牛肉", "羊肉", "鸡", "鸡肉", "鸭", "排骨", "牛排骨", "猪排骨", "青菜", "蔬菜", "菜", "汤", "豆腐", "蛋", "鸡蛋", "海鲜", "面", "面条", "饭"];
 const MEMBERS = ["kid", "jim"];
 const PEOPLE = ["mom", "kid", "jim"];
 const NAMES: Record<string, string> = { mom: "妈妈", kid: "女儿", jim: "小陈" };
@@ -197,6 +207,38 @@ function syncWishes(db: Db) {
     if (planned.has(w.dishId)) { w.status = "planned"; w.plannedFor = planned.get(w.dishId); }
     else { w.status = "open"; delete w.plannedFor; }
   }
+}
+// 定了菜 → 这道菜的食材自动进菜篮子（标着哪天哪道菜；家里有的妈妈说一句或点「不用买」拿掉）
+// 没填食材的菜先让 AI 填（最多等 8 秒，填不上就算了）
+async function fillIngredients(db: Db, ids: number[]) {
+  if (!DASHSCOPE_API_KEY) return;
+  const need = ids.map((id) => db.dishes.find((d) => d.id === id)).filter((d): d is Dish => !!d && !(d.ingredients || []).length).slice(0, 4);
+  if (!need.length) return;
+  await Promise.all(need.map(async (d) => {
+    const items = await Promise.race([qwenIngredients(d.name).catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), 8000))]);
+    if (items && items.length) d.ingredients = cleanList(items);
+  }));
+}
+function autoShop(db: Db, date: string, ids: number[]): string[] {
+  const added: string[] = [];
+  for (const id of ids) {
+    const d = db.dishes.find((x) => x.id === id); if (!d || d.cat !== "dinner") continue;
+    for (const n of d.ingredients || []) {
+      if (db.shopping.some((it) => it.name === n && !it.done)) continue;
+      if (db.shopping.length >= 150) return added;
+      db.shopping.push({ id: Date.now() + Math.floor(Math.random() * 1e6), name: n, done: false, from: `${weekdayOf(date)} · ${d.name}`, at: nowIso(), auto: true, dishId: d.id });
+      added.push(n);
+    }
+  }
+  return added;
+}
+// 菜换掉了：它自动加的、还没买的拿掉（别的还排着的菜也要用的留着）
+function pruneAuto(db: Db) {
+  const ids = new Set<number>(); const need = new Set<string>();
+  for (const p of Object.values(db.plans)) if (!p.done && p.cook) for (const id of p.cook.dishIds) {
+    ids.add(id); for (const n of db.dishes.find((d) => d.id === id)?.ingredients || []) need.add(n);
+  }
+  db.shopping = db.shopping.filter((it) => it.done || !it.auto || (it.dishId != null && ids.has(it.dishId)) || need.has(it.name));
 }
 // 一天的晚饭结算：菜记一次“做过”，心愿变“做过了”，心愿上的红包记进账本
 function finishPlan(db: Db, p: Plan): { made: Dish[]; hb: Ledger[] } {
@@ -308,8 +350,8 @@ function describe(db: Db, who: string, evs: Ev[]): string[] {
     // 妈妈的动作
     else if (e.k === "cook" && e.date) {
       const p = db.plans[e.date]; if (!p?.cook || p.done) continue;
-      const names = dishNames(db, p.cook.dishIds);
-      if (names) lines.push(`${weekdayOf(e.date)}晚上做 ${names}${p.cook.text ? "、" + p.cook.text : ""}`);
+      const names = [dishNames(db, p.cook.dishIds), p.cook.pending ? `${p.cook.pending}（还没定怎么做）` : ""].filter(Boolean).join("、");
+      if (names) lines.push(`${weekdayOf(e.date)}晚上做 ${names}${p.cook.text && p.cook.text !== UNSURE && p.cook.text !== NO_COOK ? "、" + p.cook.text : ""}`);
       else if (p.cook.text && p.cook.text !== UNSURE) lines.push(`${weekdayOf(e.date)}晚上${p.cook.text}`);
     }
     else if (e.k === "made" && e.date) {
@@ -498,9 +540,11 @@ async function qwenIngredients(name: string): Promise<string[]> {
   return (items as unknown[]).map((x) => String(x).trim()).filter((x) => x && x.length <= 12).slice(0, 12);
 }
 
-async function qwenSuggest(cat: Cat, have: string[]): Promise<{ name: string; ingredients: string[] }[]> {
-  const kind = cat === "breakfast" ? "早饭" : "家常正餐（午饭晚饭的菜）";
-  const sys = `你是中餐家常菜助手，给一家人推荐新菜。推荐 6 道适合在家做的${kind}，要求：菜单里已经有的不要推荐；做法不复杂；食材在美国的华人超市买得到；荤素搭配，口味别都一样。每道菜附上要买的主要食材（不含盐糖油生抽葱姜蒜这类基础调料），每项 2 到 6 个字，3 到 8 项。菜名 2 到 8 个字。只返回 JSON：{"items":[{"name":"菜名","ingredients":["..."]}]}`;
+// AI 想新菜：带要买的东西和做法。query 是一类菜（「鱼」），没有就随便推荐
+async function qwenIdeas(cat: Cat, have: string[], query = "", n = 6): Promise<{ name: string; ingredients: string[]; steps: string[] }[]> {
+  const kind = cat === "breakfast" ? "早饭" : "家常正餐（晚饭的菜）";
+  const what = query ? `用「${query}」做的${kind}，${n} 道，做法各不一样（清蒸、红烧、煎、炖、炒、汤……）` : `${n} 道适合在家做的${kind}，荤素搭配，口味别都一样`;
+  const sys = `你是中餐家常菜助手，给一家人推荐新菜。推荐${what}。要求：菜单里已经有的不要推荐；做法不复杂；食材在美国的华人超市买得到。每道菜附上要买的主要食材（不含盐糖油生抽料酒葱姜蒜这类家里都有的调料，每项 2 到 6 个字，3 到 8 项），和做法（3 到 6 步，每步一句、不超过 25 个字，写给会做饭的长辈看，说清火候和时间）。菜名 2 到 8 个字。只返回 JSON：{"items":[{"name":"菜名","ingredients":["..."],"steps":["..."]}]}`;
   const user = "菜单里已经有：" + (have.length ? have.slice(0, 120).join("、") : "（还是空的）");
   const msgs = [{ role: "system", content: sys }, { role: "user", content: user }];
   let content = "";
@@ -512,14 +556,116 @@ async function qwenSuggest(cat: Cat, have: string[]): Promise<{ name: string; in
   let items: unknown = [];
   try { const j = JSON.parse(content); items = Array.isArray(j) ? j : (j.items || j.dishes || []); }
   catch { const m = content.match(/\[[\s\S]*\]/); if (m) { try { items = JSON.parse(m[0]); } catch { items = []; } } }
-  const out: { name: string; ingredients: string[] }[] = [];
+  const out: { name: string; ingredients: string[]; steps: string[] }[] = [];
   for (const x of (Array.isArray(items) ? items : [])) {
     // deno-lint-ignore no-explicit-any
     const o = x as any; const name = String((o && o.name) || (typeof o === "string" ? o : "")).trim().slice(0, 30);
     if (!name || have.includes(name) || out.some((y) => y.name === name)) continue;
-    out.push({ name, ingredients: cleanList(o && o.ingredients).filter((y) => y.length <= 12).slice(0, 10) });
+    out.push({ name, ingredients: cleanList(o && o.ingredients).filter((y) => y.length <= 12).slice(0, 10), steps: cleanSteps(o && o.steps) });
   }
-  return out.slice(0, 8);
+  return out.slice(0, Math.max(1, n));
+}
+
+// ---- 一句话 → 要做的事 ----
+// 妈妈习惯一句话说好几件事：「星期三做鱼，礼拜五包饺子，买点葱姜，丝瓜汤这次做不了没丝瓜了」
+// 先拆成 actions 给网页，网页念给她听、她说「对」才执行。听不懂的放进 unclear，绝不猜着加。
+type Act = { type: string; date?: string; dish?: string; generic?: boolean; dishId?: number; isNew?: boolean;
+  items?: { name: string; note?: string }[]; names?: string[]; reason?: string; wishIds?: number[]; what?: string; query?: string; name?: string; cat?: string; text?: string };
+const DAY_CN = "日一二三四五六";
+function dayWord(date: string, today: string): string {
+  const w = "周" + DAY_CN[new Date(date + "T00:00:00Z").getUTCDay()];
+  return date === today ? `今晚 ${w}` : date === addDays(today, 1) ? `明晚 ${w}` : date === addDays(today, 2) ? `后天晚上 ${w}` : `${w}晚上`;
+}
+async function qwenIntent(db: Db, text: string, prev: string, today: string, dates: string[]): Promise<Act[]> {
+  const dinner = db.dishes.filter((d) => d.cat === "dinner").map((d) => d.name);
+  const bf = db.dishes.filter((d) => d.cat === "breakfast").map((d) => d.name);
+  const shop = db.shopping.filter((x) => !x.done).map((x) => x.name);
+  const wishes = db.wishes.filter((w) => w.status !== "done").map((w) => `${NAMES[w.who] || w.who}想吃${db.dishes.find((d) => d.id === w.dishId)?.name || ""}`);
+  const sys = `你帮一位不太会用手机的妈妈，把她说的一句话拆成要做的事。她说话随意，一句话里可能有好几件事；语音识别可能有错字，按意思理解（比如「小程」就是「小陈」，「礼拜三」「星期三」「周三」一样）。
+可以排晚饭的日子，第一个是今晚：${dates.map((d) => `${d}（${dayWord(d, today)}）`).join("、")}
+家里菜谱里的晚饭菜：${dinner.join("、") || "（没有）"}
+早饭：${bf.join("、") || "（没有）"}
+菜篮子里还没买的：${shop.join("、") || "（空的）"}
+家里人想吃、还没做的：${wishes.join("、") || "（没有）"}
+
+只返回 JSON：{"actions":[...]}。每个 action 只能是下面一种：
+{"type":"plan","date":"日期","dish":"菜名","generic":false} 哪天晚上做什么，一道菜一条；没说哪天就是今晚；菜名跟菜谱里是同一道菜时用菜谱里的写法；只说了一类东西、没说怎么做（鱼、排骨、鸡、牛肉、青菜、汤）时 generic 为 true，dish 写那一类。
+{"type":"unplan","date":"日期","dish":"菜名"} 那天不做这道了。
+{"type":"nocook","date":"日期"} 那天不做饭。
+{"type":"buy","items":[{"name":"东西","note":"数量或备注，没有就空字符串"}]} 要买的东西。
+{"type":"have","items":[{"name":"东西"}]} 家里有了、不用买了。
+{"type":"bought","items":[{"name":"东西"}]} 已经买到了。
+{"type":"ordered"} 都下单了，菜篮子清空。
+{"type":"decline","dish":"菜名","reason":"原因，没有就空字符串"} 家里人想吃的某道菜这次做不了。
+{"type":"made"} 今晚的饭做好了。
+{"type":"ask","what":"home"} 她在问问题，what 是 home（今晚几个人回来吃）、breakfast（早饭吃什么）、plan（这几天做什么）、shopping（还要买什么）之一。
+{"type":"ideas","query":"一类菜"} 她想看某类菜有什么做法，或者想要新菜点子；没说哪类时 query 为空字符串。
+{"type":"add_dish","name":"菜名","cat":"dinner"} 只把一道菜加进菜谱、不排日子；早饭 cat 写 breakfast。
+{"type":"unclear","text":"原话里听不懂的那一段"} 听不懂、拿不准的部分原样放这里，不要猜。
+不要编她没说的事。菜名和东西名里不要带「做」「吃」「买」「星期三」这类字。`;
+  const user = prev ? `她刚才说：「${prev}」\n现在她更正说：「${text}」\n按更正后的意思，给出完整的 actions。` : text;
+  let content = "";
+  const msgs = [{ role: "system", content: sys }, { role: "user", content: user }];
+  try { content = await qwenChat(msgs, { response_format: { type: "json_object" }, temperature: 0.1 }); }
+  catch (e) { if (String(e).includes("response_format") || String(e).includes("400")) content = await qwenChat(msgs, { temperature: 0.1 }); else throw e; }
+  const j = JSON.parse((content.match(/\{[\s\S]*\}/) || ["{}"])[0]);
+  return Array.isArray(j.actions) ? j.actions : [];
+}
+// 没有 AI 或者 AI 出错时的简单兜底：认得日子、「做」「买」「买到了」「家里有」「做好了」
+function localIntent(text: string, today: string, dates: string[]): Act[] {
+  const t = text.replace(/[，,。.!！?？\s]+/g, "，");
+  const out: Act[] = [];
+  for (const seg of t.split("，").map((x) => x.trim()).filter(Boolean)) {
+    let date = dates[0];
+    const m = seg.match(/(?:星期|礼拜|周)([一二三四五六日天])/);
+    if (m) { const k = "日一二三四五六天".indexOf(m[1]) % 7; const hit = dates.find((d) => new Date(d + "T00:00:00Z").getUTCDay() === k); if (hit) date = hit; }
+    else if (/明天|明晚/.test(seg)) date = dates.find((d) => d === addDays(today, 1)) || date;
+    else if (/后天/.test(seg)) date = dates.find((d) => d === addDays(today, 2)) || date;
+    const body = seg.replace(/(?:星期|礼拜|周)[一二三四五六日天]|今天|今晚|明天|明晚|后天|晚上|我们|我|要|想/g, "");
+    if (/做好了/.test(body)) out.push({ type: "made" });
+    else if (/(买到了|买了)/.test(body)) out.push({ type: "bought", items: [{ name: body.replace(/(买到了|买了|也|都)/g, "") }] });
+    else if (/(家里有|不用买)/.test(body)) out.push({ type: "have", items: [{ name: body.replace(/(家里有了?|不用买了?)/g, "") }] });
+    else if (/不做饭/.test(body)) out.push({ type: "nocook", date });
+    else if (/^买/.test(body) || /买点|买个|买些/.test(body)) for (const n of body.replace(/买点|买个|买些|买/g, "、").split(/[、和跟]/)) { if (n.trim()) out.push({ type: "buy", items: [{ name: n.trim() }] }); }
+    else if (/(做|烧|炖|蒸|煮|包)/.test(body)) out.push({ type: "plan", date, dish: body.replace(/^(做|烧|炖|蒸|煮)/, "") });
+    else out.push({ type: "unclear", text: seg });
+  }
+  return out;
+}
+// 把 AI 给的 actions 对上家里的数据：日子、菜（菜谱里有没有、是不是一类菜）、心愿
+function resolveActs(db: Db, acts: Act[], dates: string[]): Act[] {
+  const out: Act[] = [];
+  const norm = (x: unknown) => String(x ?? "").replace(/\s+/g, "").trim().slice(0, 30);
+  const day = (d: unknown) => (dates.includes(String(d)) ? String(d) : dates[0]);
+  const items = (v: unknown) => (Array.isArray(v) ? v : []).map((x) => typeof x === "string" ? { name: norm(x) } : { name: norm(x?.name), note: norm(x?.note).slice(0, 20) || undefined }).filter((x) => x.name && x.name.length <= 12);
+  for (const a of acts.slice(0, 20)) {
+    const type = String(a?.type || "");
+    if (type === "plan") {
+      const name = norm(a.dish); if (!name) continue;
+      const dish = db.dishes.find((d) => d.name === name);
+      const contains = db.dishes.filter((d) => d.cat === "dinner" && d.name !== name && d.name.includes(name));
+      const generic = CATEGORY_WORDS.includes(name) || (!dish && !!a.generic) || (!dish && name.length <= 2 && contains.length >= 2);
+      out.push(generic ? { type, date: day(a.date), dish: name, generic: true } : { type, date: day(a.date), dish: name, dishId: dish?.id, isNew: !dish });
+    } else if (type === "unplan") {
+      const name = norm(a.dish); const date = day(a.date); const p = db.plans[date];
+      const dish = p?.cook?.dishIds.map((id) => db.dishes.find((d) => d.id === id)).find((d) => d && (d.name === name || d.name.includes(name) || name.includes(d.name)));
+      if (dish) out.push({ type, date, dish: dish.name, dishId: dish.id });
+      else if (p?.cook?.pending && (p.cook.pending === name)) out.push({ type, date, dish: name });
+      else out.push({ type: "unclear", text: `${name}（那天没排这道）` });
+    } else if (type === "nocook") out.push({ type, date: day(a.date) });
+    else if (type === "buy" || type === "have" || type === "bought") { const it = items(a.items); if (it.length) out.push({ type, items: it }); }
+    else if (type === "ordered" || type === "made") out.push({ type });
+    else if (type === "decline") {
+      const name = norm(a.dish);
+      const ws = db.wishes.filter((w) => w.status !== "done").filter((w) => { const d = db.dishes.find((x) => x.id === w.dishId); return d && (d.name === name || d.name.includes(name) || name.includes(d.name)); });
+      if (ws.length) out.push({ type, dish: db.dishes.find((d) => d.id === ws[0].dishId)!.name, reason: norm(a.reason).slice(0, 20), wishIds: ws.map((w) => w.id), names: [...new Set(ws.map((w) => NAMES[w.who] || w.who))] });
+      else out.push({ type: "unclear", text: `${name}做不了（没人点这道菜）` });
+    } else if (type === "ask") { const w = String(a.what || ""); out.push({ type, what: ["home", "breakfast", "plan", "shopping"].includes(w) ? w : "plan" }); }
+    else if (type === "ideas") out.push({ type, query: norm(a.query).slice(0, 10) });
+    else if (type === "add_dish") { const name = norm(a.name); if (name) out.push({ type, name, cat: a.cat === "breakfast" ? "breakfast" : "dinner", isNew: !db.dishes.some((d) => d.name === name) }); }
+    else if (type === "unclear") { const t = norm(a.text); if (t) out.push({ type, text: t }); }
+  }
+  return out;
 }
 
 // ---- 响应 ----
@@ -540,6 +686,7 @@ const json = (body: unknown, status = 200) => {
   return new Response(encoder.encode(JSON.stringify(body)), { status, headers });
 };
 const bad = (msg: string, status = 400) => json({ error: msg }, status);
+const cleanSteps = (v: unknown) => (Array.isArray(v) ? v : []).map((x) => String(x).replace(/^\s*\d+[.、．)]\s*/, "").trim()).filter((x) => x && x.length <= 60).slice(0, 10);
 const cleanList = (v: unknown) => (Array.isArray(v) ? v : []).map((x) => String(x).trim()).filter((x) => x && x.length <= 20).filter((x, i, a) => a.indexOf(x) === i).slice(0, 30);
 
 Deno.serve(async (req: Request) => {
@@ -552,7 +699,7 @@ Deno.serve(async (req: Request) => {
   if (m === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders() });
 
   try {
-    if (m === "GET" && path === "/") return json({ ok: true, hint: "这是早饭决定器的接口；网页请打开 GitHub Pages 的地址。", tz: TZ, qwenKey: DASHSCOPE_API_KEY ? "已配置" : "没有读到 DASHSCOPE_API_KEY", tokenPlan: IS_TOKEN_PLAN, qwenBase: DASHSCOPE_BASE_URL, asrBase: ASR_BASE_URL, asrModel: QWEN_ASR_MODEL, chatModel: QWEN_CHAT_MODEL });
+    if (m === "GET" && path === "/") return json({ ok: true, build: BUILD, hint: "这是早饭决定器的接口；网页请打开 GitHub Pages 的地址。", tz: TZ, qwenKey: DASHSCOPE_API_KEY ? "已配置" : "没有读到 DASHSCOPE_API_KEY", tokenPlan: IS_TOKEN_PLAN, qwenBase: DASHSCOPE_BASE_URL, asrBase: ASR_BASE_URL, asrModel: QWEN_ASR_MODEL, chatModel: QWEN_CHAT_MODEL });
 
     // 自检：key 的样子 + 几个地址哪个认这把 key（不泄露 key 本身）
     if (m === "GET" && path === "/api/qwen-check") {
@@ -655,6 +802,7 @@ Deno.serve(async (req: Request) => {
       const dish = ensureDish(db, name, cat, String(body.by || ""));
       if (body.mom === true) dish.mom = true;
       if (body.ingredients) dish.ingredients = cleanList(body.ingredients);
+      if (body.steps) dish.steps = cleanSteps(body.steps);
       await saveDb(db);
       return json({ dish, existed: false });
     }
@@ -703,6 +851,7 @@ Deno.serve(async (req: Request) => {
         if (body.cat === "dinner" || body.cat === "breakfast") dish.cat = body.cat;
         if (typeof body.mom === "boolean") dish.mom = body.mom;
         if (body.ingredients !== undefined) dish.ingredients = cleanList(body.ingredients);
+        if (body.steps !== undefined) dish.steps = cleanSteps(body.steps);
         await saveDb(db);
         return json({ dish });
       }
@@ -762,11 +911,25 @@ Deno.serve(async (req: Request) => {
       scheduleNotify(t);
       return json({ wishes: db.wishes, dish });
     }
-    const wishRoute = path.match(/^\/api\/wishes\/(\d+)\/(remove|update)$/);
+    const wishRoute = path.match(/^\/api\/wishes\/(\d+)\/(remove|update|decline)$/);
     if (wishRoute && m === "POST") {
       const id = Number(wishRoute[1]);
       const { db } = await loadDb();
       let t: { who: string; token: number } | null = null;
+      if (wishRoute[2] === "decline") {
+        // 妈妈说这道菜这次做不了（比如时令过了）：心愿拿掉，告诉点菜的人，带上原因
+        const body = await req.json().catch(() => ({}));
+        const w = db.wishes.find((x) => x.id === id);
+        if (!w) return bad("找不到这个心愿", 404);
+        const d = db.dishes.find((x) => x.id === w.dishId);
+        const reason = cleanMsg(body.reason);
+        db.wishes = db.wishes.filter((x) => x.id !== id);
+        const text = `妈妈：${d?.name || "这道菜"} 这次做不了${reason ? "，" + reason : ""}，换一道吧`;
+        inboxAdd(db, w.who, "mom", text);
+        await saveDb(db);
+        inBackground(pushTo(db, w.who, { title: "吃什么 · 妈妈说", body: text, tag: "breakfast-mom" }));
+        return json({ wishes: db.wishes });
+      }
       if (wishRoute[2] === "remove") db.wishes = db.wishes.filter((w) => w.id !== id);
       else {
         const body = await req.json().catch(() => ({}));
@@ -817,13 +980,32 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true });
     }
 
-    if (m === "POST" && path === "/api/suggest") {
+    if (m === "POST" && (path === "/api/suggest" || path === "/api/ideas")) {
       if (!DASHSCOPE_API_KEY) return bad("还没配置 AI", 501);
       const body = await req.json().catch(() => ({}));
       const cat: Cat = body.cat === "breakfast" ? "breakfast" : "dinner";
+      const query = String(body.query || "").trim().slice(0, 10);
+      const n = Math.min(8, Math.max(1, Number(body.n) || (query ? 3 : 6)));
+      const exclude = (Array.isArray(body.exclude) ? body.exclude : []).map((x: unknown) => String(x)).slice(0, 30);
       const { db } = await loadDb();
-      try { return json({ items: await qwenSuggest(cat, db.dishes.map((d) => d.name)) }); }
+      try { return json({ items: await qwenIdeas(cat, [...db.dishes.map((d) => d.name), ...exclude], query, n) }); }
       catch { return bad("AI 服务出错了，请再试一次", 502); }
+    }
+
+    if (m === "POST" && path === "/api/intent") {
+      const body = await req.json().catch(() => ({}));
+      const text = String(body.text || "").trim().slice(0, 300);
+      const prev = String(body.prev || "").trim().slice(0, 300);
+      if (!text) return bad("没听到说什么");
+      const { db } = await loadDb();
+      const today = DATE_RE.test(String(body.today || "")) ? String(body.today) : localNow(db).date;
+      let dates: string[] = (Array.isArray(body.dates) ? body.dates : []).map(String).filter((d: string) => DATE_RE.test(d)).slice(0, 14);
+      if (!dates.length) dates = [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(today, i));
+      let acts: Act[] = []; let via = "ai";
+      if (DASHSCOPE_API_KEY) { try { acts = await qwenIntent(db, text, prev, today, dates); } catch (e) { console.error("intent ai failed", e); via = "local"; } }
+      else via = "local";
+      if (via === "local") acts = localIntent(prev ? text : text, today, dates);
+      return json({ text, actions: resolveActs(db, acts, dates), via });
     }
 
     if (m === "POST" && path === "/api/dinner/reply") {
@@ -850,14 +1032,22 @@ Deno.serve(async (req: Request) => {
       const plan = planFor(db, date);
       const ids: number[] = (Array.isArray(body.dishIds) ? body.dishIds.map(Number) : []).filter((x: number, k: number, a: number[]) => a.indexOf(x) === k && db.dishes.some((d) => d.id === x));
       const text = String(body.text || "").trim().slice(0, 60);
+      const pending = String(body.pending || "").trim().slice(0, 20);
       if (plan.done) return bad("这天已经做好了");
-      const before = JSON.stringify(plan.cook ? [plan.cook.dishIds, plan.cook.text] : null);
-      plan.cook = ids.length || text ? { dishIds: ids, text, at: nowIso() } : null;
+      const sig = () => JSON.stringify(plan.cook ? [plan.cook.dishIds, plan.cook.text, plan.cook.pending || ""] : null);
+      const before = sig();
+      const prevIds = plan.cook ? plan.cook.dishIds.slice() : [];
+      plan.cook = ids.length || text || pending ? { dishIds: ids, text, at: nowIso(), ...(pending ? { pending } : {}) } : null;
+      // 新排上的菜：食材自动进菜篮子；换掉的菜自动加的东西拿掉
+      const newIds = ids.filter((x) => !prevIds.includes(x));
+      await fillIngredients(db, newIds);
+      const shopAdded = autoShop(db, date, newIds);
+      pruneAuto(db);
       syncWishes(db);
-      const t = JSON.stringify(plan.cook ? [plan.cook.dishIds, plan.cook.text] : null) !== before ? queueNotify(db, "mom", { k: "cook", date }) : null;
+      const t = sig() !== before ? queueNotify(db, "mom", { k: "cook", date }) : null;
       await saveDb(db);
       scheduleNotify(t);
-      return json({ plan, wishes: db.wishes });
+      return json({ plan, wishes: db.wishes, shopAdded });
     }
 
     // 妈妈点「做好了」：当场结算这天的晚饭，红包进账本，告诉女儿、小陈
@@ -887,25 +1077,39 @@ Deno.serve(async (req: Request) => {
       const { db } = await loadDb();
       const today = localNow(db).date;
       if (date < addDays(today, -2) || date > addDays(today, 14)) return bad("只能排最近两周的");
-      const dish = db.dishes.find((d) => d.id === Number(body.dishId));
-      if (!dish) return bad("找不到这道菜");
       const plan = planFor(db, date);
       if (plan.done) return bad("这天已经做好了，换一天吧");
-      const ids = plan.cook ? plan.cook.dishIds.slice() : [];
+      const keep = plan.cook && plan.cook.text && plan.cook.text !== UNSURE && plan.cook.text !== NO_COOK ? plan.cook.text : "";
+      // 只说了一类菜（「周三做鱼」）还没定怎么做：先记下这一类，菜篮子里会提醒
+      const pendingOnly = String(body.pending || "").trim().slice(0, 20);
+      if (pendingOnly && !body.dishId) {
+        plan.cook = { dishIds: plan.cook ? plan.cook.dishIds.slice() : [], text: keep, at: nowIso(), pending: pendingOnly };
+        const tp = queueNotify(db, who, who === "mom" ? { k: "cook", date } : { k: "plan", date });
+        await saveDb(db);
+        scheduleNotify(tp);
+        return json({ plan, wishes: db.wishes, added: false, shopAdded: [] });
+      }
+      const dish = db.dishes.find((d) => d.id === Number(body.dishId));
+      if (!dish) return bad("找不到这道菜");
+      // replaceDishId：原来排的是「鱼」这种没食材的菜，换成具体的做法
+      const ids = (plan.cook ? plan.cook.dishIds.slice() : []).filter((x) => x !== Number(body.replaceDishId));
       const added = !ids.includes(dish.id);
       if (added) ids.push(dish.id);
-      // 原来写的「还没想好」「不做饭」作废；别的文字（比如妈妈说的一道菜单外的菜）留着
-      const keep = plan.cook && plan.cook.text && plan.cook.text !== UNSURE && plan.cook.text !== NO_COOK ? plan.cook.text : "";
-      plan.cook = { dishIds: ids, text: keep, at: nowIso() };
+      // 原来写的「还没想好」「不做饭」作废；别的文字（比如妈妈说的一道菜单外的菜）留着；定了具体做法，「还没定怎么做」也作废
+      const pend = plan.cook?.pending && !body.clearPending ? { pending: plan.cook.pending } : {};
+      plan.cook = { dishIds: ids, text: keep, at: nowIso(), ...pend };
       // 女儿小陈排的：也算点了这道菜，进心愿单（可以包红包，做好了会结算）
       if (MEMBERS.includes(who) && !db.wishes.some((w) => w.dishId === dish.id && w.who === who && w.status !== "done")) {
         db.wishes.push({ id: Date.now(), dishId: dish.id, who, at: nowIso(), status: "open" });
       }
+      await fillIngredients(db, added ? [dish.id] : []);
+      const shopAdded = added ? autoShop(db, date, [dish.id]) : [];
+      pruneAuto(db);
       syncWishes(db);
       const t = added ? queueNotify(db, who, who === "mom" ? { k: "cook", date } : { k: "plan", id: dish.id, date }) : null;
       await saveDb(db);
       scheduleNotify(t);
-      return json({ plan, wishes: db.wishes, added });
+      return json({ plan, wishes: db.wishes, added, shopAdded });
     }
 
     // 红包发了：账本里标成已发
@@ -929,16 +1133,23 @@ Deno.serve(async (req: Request) => {
       const body = await req.json().catch(() => ({}));
       const op = String(body.op || "");
       const { db } = await loadDb();
+      const added: number[] = [];
+      // 按名字找清单里还没买的（说「鸡蛋」也能对上「土鸡蛋」）
+      const findOpen = (n: string) => db.shopping.filter((it) => !it.done && (it.name === n || it.name.includes(n) || n.includes(it.name)));
       if (op === "add") {
         const names = cleanList(body.names);
         if (!names.length) return bad("没有要加的东西");
         const from = typeof body.from === "string" ? body.from.slice(0, 30) : "";
+        const notes = body.notes && typeof body.notes === "object" ? body.notes : {};
         for (const n of names) {
           const open = db.shopping.find((it) => it.name === n && !it.done);
-          if (open) continue;
+          const note = typeof notes[n] === "string" ? notes[n].trim().slice(0, 20) : "";
+          if (open) { if (note) open.note = note; continue; }
           if (db.shopping.length >= 150) return bad("清单太长了，先清一下已买的");
-          db.shopping.push({ id: Date.now() + Math.floor(Math.random() * 1000), name: n, done: false, from: from || undefined, at: nowIso() });
+          const id = Date.now() + Math.floor(Math.random() * 1e6);
+          db.shopping.push({ id, name: n, done: false, from: from || undefined, at: nowIso(), note: note || undefined });
           db.shopHistory[n] = (db.shopHistory[n] || 0) + 1;
+          added.push(id);
         }
         const keys = Object.keys(db.shopHistory);
         if (keys.length > 60) for (const k of keys.sort((a, b) => db.shopHistory[a] - db.shopHistory[b]).slice(0, keys.length - 60)) delete db.shopHistory[k];
@@ -948,6 +1159,15 @@ Deno.serve(async (req: Request) => {
         if (!it) return bad("清单里没有这一项", 404);
         if (op === "remove") db.shopping = db.shopping.filter((x) => x.id !== id);
         else { it.done = !it.done; it.doneAt = it.done ? nowIso() : undefined; }
+      } else if (op === "check" || op === "drop") {
+        // 说一句：「鸡蛋买到了」= check（打钩），「葱家里有」= drop（拿掉）
+        const names = cleanList(body.names); const hit: string[] = [];
+        for (const n of names) for (const it of findOpen(n)) {
+          hit.push(it.name);
+          if (op === "check") { it.done = true; it.doneAt = nowIso(); } else db.shopping = db.shopping.filter((x) => x.id !== it.id);
+        }
+        await saveDb(db);
+        return json({ shopping: db.shopping, hit });
       } else if (op === "clear_done") {
         db.shopping = db.shopping.filter((x) => !x.done);
       } else if (op === "ordered") {
@@ -955,7 +1175,7 @@ Deno.serve(async (req: Request) => {
         db.shopping = [];
       } else return bad("不认识的操作");
       await saveDb(db);
-      return json({ shopping: db.shopping });
+      return json({ shopping: db.shopping, added });
     }
 
     if (m === "POST" && path === "/api/push/subscribe") {

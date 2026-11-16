@@ -6,9 +6,12 @@
 
 ```bash
 cd tests/ux && npm install
-./run-backend.sh ../../supabase/functions/breakfast 8787 &      # 本地后端，数据在 db-8787.json
+node mock-qwen.js &                                             # 假的 AI（固定回答几句话）
+DASHSCOPE_API_KEY=sk-test DASHSCOPE_BASE_URL=http://localhost:8790/v1 \
+  ./run-backend.sh ../../supabase/functions/breakfast 8787 &      # 本地后端，数据在 db-8787.json
 python3 -m http.server 8080 --directory ../../docs &            # 网页
-node tasks-before.js        # 五件事各要点几下（每个任务从 fixture 重新开始）
+node tasks-before.js        # 改版前：五件事各要点几下（每个任务从 fixture 重新开始）
+node tasks-after.js         # 改版后：一句话入口、一类菜、做不了、菜谱、菜篮子、这几天，跑一遍并检查数据
 node inventory.js shots-before   # 每个页签几屏长、多少能点的东西，截全页图
 node axe.js                 # axe-core 无障碍检查
 python3 sheet.py shots-before/mom-today.png sheet.png   # 长截图切成一屏一格

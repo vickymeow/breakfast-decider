@@ -16,6 +16,7 @@
 /* 老人优先：浅底深字、超大字、大按钮；妈妈只做三件事：看、点一下、打钩 */
 :root{--bg:#fff8e7;--paper:#fff;--fg:#1f1b17;--muted:#6f655a;--line:#eadcb8;--accent:#ffcf4d;--accent-deep:#f0b000;--pick:#ff8c00;--pick-soft:#fff0d2;--good:#1b7a2a;--good-soft:#e3f5e4;--bad:#c62828;--bad-soft:#ffe3e3;--soft:#ffe9a8}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
 html,body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:20px;line-height:1.3}
 body{padding:env(safe-area-inset-top) max(14px,env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));max-width:720px;margin:0 auto;min-height:100vh}
 button,input{font:inherit;color:inherit}
@@ -249,6 +250,108 @@ button.dlink .go{font-size:.75em;color:var(--accent-deep);margin-left:2px;text-d
 #speakBox .lab{font-size:18px;color:var(--muted);margin-bottom:4px}
 .secfold.sm{font-size:20px;font-weight:700;margin:4px 0 0;padding:6px 0}
 .toast.long{font-size:24px;line-height:1.35;padding:18px 24px}
+/* ---- 一句话入口、确认单、做法、选哪天（妈妈端改版） ---- */
+nav button{font-size:22px;padding:10px 2px 8px}
+nav button small{display:block;font-size:14px;font-weight:400;color:var(--muted);margin-top:2px}
+nav button.active small{color:#5a4600}
+button.vbig{display:block;width:100%;text-align:center;background:#e8f5e9;border:4px solid #2e7d32;border-radius:24px;padding:16px 10px 12px;margin:4px 0 4px;color:#1b5e20}
+button.vbig b{display:block;font-size:30px;color:var(--fg)}
+button.vbig small{font-size:17px}
+button.vbig.listening{background:var(--pick-soft);border-color:var(--pick)}
+.vtype{text-align:right;margin:0 0 4px}
+.vlink{border:none;background:none;color:var(--muted);font-size:17px;padding:4px 2px;text-decoration:underline}
+.vform{margin:6px 0}
+.line1{background:var(--paper);border:3px solid var(--line);border-radius:18px;padding:12px 14px;margin:8px 0 12px;font-size:22px}
+.line1 .k{color:var(--muted);font-size:18px;margin-right:8px}
+.line1 small{color:var(--muted);font-size:16px;margin-left:6px}
+.tonight h2,.daysbox h2{font-size:26px;margin:0 0 6px}
+.tonight h2 small,.daysbox h2 small{font-size:17px;color:var(--muted);font-weight:400}
+.tonight .who{font-size:21px;margin:2px 0 8px;line-height:1.7}
+.tonight .stat{font-size:18px;color:var(--good);font-weight:700;margin-top:4px}
+.wrow{border-top:2px solid var(--line);padding:10px 0}
+.wrow .n{font-size:23px;font-weight:800}
+.wrow .n small{font-weight:400;font-size:16px;color:var(--muted)}
+.btns3{display:flex;gap:8px;margin-top:8px}
+.btns3 button{flex:1;min-width:0;font-size:19px;font-weight:800;padding:12px 4px;border-radius:16px;border:3px solid var(--accent-deep);background:var(--accent)}
+.btns3 button.g{background:var(--paper);border-color:var(--line);color:var(--muted)}
+.btns3 button.r{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.btns3 button.r.confirm{background:var(--bad);color:#fff}
+.drow{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;border:none;border-top:2px solid var(--line);background:none;padding:12px 2px;font-size:21px;text-align:left}
+.drow:first-of-type{border-top:none}
+.drow span:last-child{font-weight:800;text-align:right;overflow-wrap:anywhere}
+.drow .no{color:var(--muted);font-weight:400}
+.oneline{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;font-size:19px;color:var(--muted);background:var(--paper);border:2px dashed var(--line);border-radius:14px;padding:10px 12px;margin-bottom:8px}
+.heard{background:var(--paper);border:3px dashed #2e7d32;border-radius:16px;padding:10px 12px;font-size:19px;color:#1b5e20;margin:0 0 10px;overflow-wrap:anywhere}
+.act{display:flex;gap:8px;align-items:flex-start;background:var(--paper);border:3px solid var(--line);border-radius:18px;padding:10px 12px;margin-bottom:8px}
+.act .x{flex:1;min-width:0}
+.act .x b{font-size:22px;display:block;overflow-wrap:anywhere}
+.act .x small{font-size:16px;color:var(--muted);display:block;margin-top:2px}
+.act .no{flex-shrink:0;font-size:16px;padding:8px 10px;border-radius:12px;border:2px solid var(--line);color:var(--muted);background:var(--bg)}
+.act.off{opacity:.45}.act.off .x b{text-decoration:line-through}
+.act.unclear{border-style:dashed}
+.okbanner{background:var(--good-soft);border:3px solid #2e7d32;border-radius:16px;padding:10px 12px;font-size:19px;color:#1b5e20;font-weight:700;margin:0 0 10px;line-height:1.5}
+.grp{font-size:18px;font-weight:800;color:var(--muted);margin:12px 0 6px}
+button.opt{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--paper);border:3px solid var(--line);border-radius:18px;padding:10px 12px;margin-bottom:8px}
+button.opt .e{font-size:34px;flex-shrink:0}
+button.opt .x{flex:1;min-width:0}
+button.opt .x b{font-size:22px;display:block;overflow-wrap:anywhere}
+button.opt .x small{font-size:15px;color:var(--muted)}
+button.opt .go{font-size:26px;color:var(--accent-deep);font-weight:800}
+.newtag{font-size:13px;font-weight:800;color:#fff;background:#d9822b;border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:middle}
+.dsheet .dpic{position:relative;height:150px;border-radius:18px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:90px;overflow:hidden}
+.dsheet .dpic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.dsheet h2{font-size:32px;margin:10px 0 2px;overflow-wrap:anywhere}
+.dsheet .m{font-size:17px;color:var(--muted);margin-bottom:8px}
+.dsheet .sec2{font-size:18px;font-weight:800;color:var(--muted);margin:12px 0 6px;display:flex;align-items:center;gap:8px}
+.dsheet .sec2 button{font-size:16px;padding:4px 10px;border-radius:12px;border:2px solid var(--line);background:var(--bg);font-weight:700}
+.dsheet .ingl{display:flex;flex-wrap:wrap;gap:6px}
+.dsheet .ingl span{font-size:20px;padding:6px 12px;border-radius:999px;border:2px solid var(--line);background:var(--bg)}
+.dsheet ol{margin:0;padding-left:30px;font-size:21px;line-height:1.5}
+.dsheet ol li{margin-bottom:6px}
+.askbox{background:#fff3c4;border:3px solid var(--accent-deep);border-radius:18px;padding:12px;margin-top:12px;text-align:center}
+.askbox b{font-size:24px;display:block;margin-bottom:8px}
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.dgrid button{text-align:center;font-size:20px;font-weight:800;padding:10px 4px;border-radius:14px;border:3px solid var(--line);background:var(--bg);min-width:0}
+.dgrid button small{display:block;font-size:14px;font-weight:400;color:var(--muted);overflow-wrap:anywhere}
+.dgrid button.sel{background:var(--accent);border-color:var(--accent-deep)}
+.seg2{display:flex;gap:8px;margin:0 0 12px}
+.seg2 button{flex:1;font-size:22px;font-weight:800;padding:12px;border-radius:16px;border:3px solid var(--line);background:var(--paper)}
+.seg2 button.on{background:var(--accent);border-color:var(--accent-deep)}
+.rgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.rgrid .card .tg{display:inline-block;font-size:14px;font-weight:700;padding:1px 8px;border-radius:999px;margin:0 2px 8px}
+.tg.w{background:var(--good-soft);color:#1b5e20;border:1.5px solid #2e7d32}
+.tg.p{background:var(--pick-soft);color:#8a5a00;border:1.5px solid var(--accent-deep)}
+.tg.m{background:var(--bg);color:var(--muted);border:1.5px solid var(--line)}
+.remind{display:flex;gap:8px;align-items:center;background:#fff3c4;border:3px solid var(--accent-deep);border-radius:16px;padding:10px 12px;margin-bottom:8px;font-size:19px}
+.remind span{flex:1}
+.remind button{flex-shrink:0;font-size:17px;font-weight:800;padding:8px 10px;border-radius:12px;border:2px solid var(--accent-deep);background:var(--accent)}
+.shop-row .nobuy{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 10px;border-radius:18px;border:2px solid var(--line);background:var(--bg);color:var(--muted);font-size:16px;line-height:1.15;text-align:center;width:56px}
+/* 女儿小陈：这几天 */
+.dcard{background:var(--paper);border:3px solid var(--line);border-radius:22px;padding:12px 14px;margin-bottom:12px}
+.dcard h2{font-size:24px;margin:0 0 6px}
+.dcard h2 small{font-size:16px;color:var(--muted);font-weight:400}
+.meal{border-top:2px solid var(--line);padding:10px 0 4px}
+.meal:first-of-type{border-top:none;padding-top:4px}
+.mt{display:flex;align-items:baseline;gap:8px;font-size:22px;font-weight:800;margin-bottom:6px}
+.whochip{font-size:14px;font-weight:700;padding:2px 9px;border-radius:999px;background:#eef3ff;color:#2a4fa8;border:1.5px solid #9db3e8}
+.whochip.kids{background:var(--pick-soft);color:#8a5a00;border-color:var(--accent-deep)}
+.mr{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:19px;flex-wrap:wrap}
+.mr .k{width:58px;flex-shrink:0;color:var(--muted);font-size:16px}
+.mr .v{flex:1;min-width:100px;font-weight:700;overflow-wrap:anywhere}
+.mr .v small{font-weight:400;color:var(--muted);font-size:15px}
+.mr .seg{display:flex;gap:6px;flex:1}
+.mr .seg button{flex:1;min-width:0;font-size:17px;font-weight:700;padding:9px 2px;border-radius:12px;border:2px solid var(--line);background:var(--bg)}
+.mr .seg button.on.yes{background:var(--good-soft);border-color:#2e7d32}
+.mr .seg button.on.no{background:var(--bad-soft);border-color:var(--bad)}
+.mr .seg button.on.maybe{background:var(--soft);border-color:var(--accent-deep)}
+.mr .go{flex-shrink:0;font-size:16px;font-weight:800;padding:8px 10px;border-radius:12px;border:2px solid var(--accent-deep);background:var(--accent)}
+.mr .go.g{background:var(--paper);border-color:var(--line);color:var(--muted)}
+.mr.res{background:var(--bg);border-radius:12px;padding:6px 10px}
+.wchip{font-size:17px;font-weight:700;padding:4px 10px;border-radius:999px;border:2px solid #2e7d32;background:var(--good-soft);color:#1b5e20;margin:2px 4px 2px 0}
+.pickbar{position:sticky;top:calc(env(safe-area-inset-top) + 92px);z-index:4;background:var(--pick-soft);border:3px solid var(--pick);border-radius:16px;padding:10px 12px;margin:0 0 10px;display:flex;align-items:center;gap:8px;font-size:18px;font-weight:700}
+.pickbar span{flex:1}
+.pickbar button{flex-shrink:0;font-size:16px;font-weight:800;padding:8px 10px;border-radius:12px;border:2px solid var(--line);background:var(--paper)}
+.menu-list .quick button.on{background:var(--good-soft);border-color:#2e7d32;color:#1b5e20}
 body.mom{font-size:22px}
 body.mom .morning-card .name{font-size:68px}
 body.mom .cook-card .txt{font-size:54px}
@@ -269,61 +372,39 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
 <div id="app" hidden>
 <nav id="nav" aria-label="页面"></nav>
 
-<!-- 妈妈：今天 -->
+<!-- 妈妈：今天吃什么。顺序固定，不按时间对调 -->
 <section id="view-today" class="view">
   <div id="pushCard" class="push-card" hidden></div>
   <div id="cheerCard" class="push-card cheer" hidden></div>
-  <button type="button" id="btnSpeak" class="big-btn">🔊 读给我听</button>
-  <div id="speakBox" class="box" hidden></div>
-  <div id="todayBody">
-  <h2 class="sec" id="bfSec">早饭 <small id="bfDate"></small></h2>
-  <div id="morningCard" class="morning-card"></div>
-  <h2 class="sec" id="dnSec">晚饭 <small id="dnDate"></small></h2>
-  <div id="dinnerBoard" class="box"></div>
-  <div id="cookCard" class="cook-card"></div>
+  <div class="vbox" data-hint="比如：星期三做鱼，买点葱姜"></div>
+  <div id="bfLine" class="line1"></div>
+  <div id="tonightCard" class="box tonight"></div>
   <div id="chooser" class="chooser" hidden></div>
-  </div>
-  <div id="inboxBox" class="box" hidden></div>
+  <div id="daysCard" class="box daysbox"></div>
+  <button type="button" id="hbLine" class="oneline" hidden></button>
   <div id="hbBox" class="box ledger" hidden></div>
+  <button type="button" id="inboxLine" class="oneline" hidden></button>
+  <div id="inboxBox" class="box" hidden></div>
+  <button type="button" id="btnSpeak" class="big-btn ghost" style="width:100%">🔊 把今天的安排读给我听</button>
+  <div id="speakBox" class="box" hidden></div>
 </section>
 
-<!-- 女儿 / 小陈：点菜 -->
-<section id="view-order" class="view">
+<!-- 女儿 / 小陈：这几天（早饭、晚饭同一个样子：我、我想吃、定了） -->
+<section id="view-days" class="view">
   <div id="pushCardOrder" class="push-card" hidden></div>
   <div id="cheerCardOrder" class="push-card cheer" hidden></div>
-  <div class="box"><h3>回来吃晚饭吗？</h3><div id="homeRows"></div><button type="button" class="secfold sm" id="foldMoreDays"></button><p class="note" style="text-align:left;margin:8px 0 0">当天下午 5 点还没说的，妈妈按回来吃算</p></div>
-  <div class="box" id="momSaid"></div>
   <div id="myHb" class="box ledger" hidden></div>
-  <h3 class="sec">心愿单 <small style="font-size:17px;font-weight:400">点菜名看食材，顺手加进菜篮子</small></h3>
-  <div id="wishList"></div>
-  <h3 class="sec">想吃什么？<small>点一下就告诉妈妈了，不一定今天做</small></h3>
-  <div id="orderGrid" class="grid"></div>
-  <form class="add-row" id="otherForm" style="margin-top:12px">
-    <input id="otherInput" placeholder="想吃别的？说一句或打字" autocomplete="off">
-    <button type="button" id="btnOtherVoice" class="mic">🎤</button>
-    <button type="submit" class="big-btn">点菜</button>
-  </form>
-  <p id="otherStatus" class="note"></p>
-  <button type="button" id="btnOrderSuggest" class="big-btn ghost" style="width:100%" hidden>✨ 不知道吃啥？推荐几道新菜</button>
-  <p id="orderSuggestStatus" class="note"></p>
-  <div id="orderSuggest"></div>
+  <div id="daysList"></div>
+  <button type="button" class="secfold sm" id="foldMoreDays"></button>
+  <div id="moreDaysList"></div>
+  <p class="note" style="text-align:left">晚饭当天下午 5 点还没说的，妈妈按回来吃算；早饭没人选的话，早上 6 点随便定一个</p>
   <div id="inboxBoxOrder" class="box" hidden></div>
-</section>
-
-<!-- 女儿 / 小陈：早饭 -->
-<section id="view-breakfast" class="view">
-  <div id="bfAnswer" class="box" style="text-align:center"></div>
-  <p class="hint" id="pickHint"></p>
-  <div id="pickGrid" class="grid"></div>
-  <div class="special">
-    <button type="button" id="btnRandom" class="big-btn">随便</button>
-    <button type="button" id="btnSkip" class="big-btn">不吃</button>
-  </div>
-  <p id="pickStatus" class="status"></p>
 </section>
 
 <!-- 菜篮子（全家） -->
 <section id="view-shop" class="view">
+  <div class="vbox" data-hint="比如：葱家里有，鸡蛋买两盒" data-mom-only="1"></div>
+  <div id="shopRemind"></div>
   <h2 class="sec" style="margin-top:6px">要买的东西 <small id="shopCount"></small></h2>
   <form class="add-row" id="shopForm">
     <input id="shopInput" placeholder="要买什么？按 🎤 说一句" autocomplete="off">
@@ -340,8 +421,16 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
   <div id="planBox" class="box" hidden style="margin-top:10px"></div>
 </section>
 
-<!-- 菜谱本（全家） -->
+<!-- 菜谱（全家）：妈妈看图浏览；女儿小陈是可以编辑的列表 -->
 <section id="view-recipes" class="view">
+  <div class="vbox" data-hint="比如：有什么鱼？／星期三做清蒸鲈鱼" data-mom-only="1"></div>
+  <div id="pickBar" class="pickbar" hidden></div>
+  <button type="button" id="btnMenuSuggest" class="big-btn primary" style="width:100%;margin:4px 0 12px" hidden>✨ 帮我想新菜</button>
+  <div id="recipeMom" hidden>
+    <div class="seg2" id="recipeSeg"></div>
+    <div class="rgrid" id="recipeGrid"></div>
+  </div>
+  <div id="recipeKid">
   <p class="hint">说一道菜的名字就能加进去；食材也可以说</p>
   <form class="add-row" id="addForm">
     <input id="newDishName" placeholder="菜名，说一句或打字" autocomplete="off">
@@ -353,14 +442,12 @@ body.mom .chips.big button{font-size:30px;padding:18px 20px}
     <button type="button" data-cat="breakfast">早饭</button>
   </div>
   <p id="recipeStatus" class="note"></p>
-  <button type="button" id="btnMenuSuggest" class="big-btn ghost" style="width:100%" hidden>✨ 推荐几道新菜</button>
-  <p id="menuSuggestStatus" class="note"></p>
-  <div id="menuSuggest"></div>
-  <p class="menu-tip"><b>🍳 我想做</b> = 点一下、选哪天晚上，这道菜就排进那天，小饭桌上能看到。<br><b>🛒 我要买</b> = 这道菜还缺的食材一下加进菜篮子。<br><b>⭐ 拿手菜</b> = 妈妈最会做的菜：点菜页排在前面，妈妈定晚饭时单独列一栏。在菜的「详情」里设置。<br><b>☰ 按住上下拖</b>，排菜的顺序；有 🧧 红包的菜自动排最前。</p>
+  <p class="menu-tip"><b>😋 我想吃</b> = 告诉妈妈想吃这道（晚饭）。<b>🥣 就吃这个</b> = 定下一顿早饭。<br><b>🛒 我要买</b> = 这道菜还缺的食材一下加进菜篮子。<br><b>⭐ 拿手菜</b> = 妈妈最会做的菜，在菜的「详情」里设置。<b>☰ 按住上下拖</b>，排菜的顺序。</p>
   <button type="button" class="secfold" id="foldDinner"></button>
   <ul id="listDinner" class="menu-list"></ul>
   <button type="button" class="secfold" id="foldBreakfast"></button>
   <ul id="listBreakfast" class="menu-list"></ul>
+  </div>
 </section>
 
 <p id="syncNote" class="note"></p>
@@ -376,10 +463,11 @@ var FALLBACK_NAME = '鸡蛋三明治', FALLBACK_EMOJI = '🥪';
 var PEOPLE = { mom:{name:'妈妈',emoji:'👩'}, kid:{name:'女儿',emoji:'👧'}, jim:{name:'小陈',emoji:'👨'} };
 var MEMBERS = ['kid','jim'];
 var DINNER_DEFAULT_HOUR = 17, DINNER_ROLL_HOUR = 20;
-var NAV = { mom:['today','shop','recipes'], kid:['order','breakfast','shop','recipes'], jim:['order','breakfast','shop','recipes'] };
-var VIEW_NAMES = { today:'小饭桌', order:'点个菜', breakfast:'选早饭', shop:'菜篮子', recipes:'菜谱本' };
-var PLAN_DAYS = 7, SHOW_DAYS = 3;   // 晚饭可以提前排一周；平时只摊开三天，更远的折起来
-var VIEWS = ['today','order','breakfast','shop','recipes'];
+// 页签：妈妈三个（菜篮子在中间，和她熟悉的位置一样）；女儿小陈的「点个菜」「选早饭」合成「这几天」
+var NAV = { mom:['today','shop','recipes'], kid:['days','shop','recipes'], jim:['days','shop','recipes'] };
+var VIEW_NAMES = { today:['今天吃什么','看和说'], days:['这几天','吃不吃 · 想吃啥'], shop:['菜篮子','要买的'], recipes:['菜谱','有什么菜'] };
+var PLAN_DAYS = 7, SHOW_DAYS = 3;   // 晚饭可以提前排一周；女儿小陈那边平时只摊开三天
+var VIEWS = ['today','days','shop','recipes'];
 
 var state = { dishes:[], pick:null, pickDate:null, wishes:[], plans:{}, shopping:[], staples:[], recent:[], profiles:{}, voice:false, ai:false, autoPickHour:6, ledger:[], inbox:[] };
 var moreDays=false;   // 「再往后几天」摊开没
@@ -390,7 +478,8 @@ var pendingDelete=null, expandedId=null, chooser=null, newCat='dinner';
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 var toastTimer;
-function toast(msg, ms){ var t=document.querySelector('.toast'); if(!t){ t=document.createElement('div'); t.className='toast'; document.body.appendChild(t);} t.textContent=msg; t.hidden=false; t.classList.toggle('long', !!(ms&&ms>3000)); clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.hidden=true; },ms||2600); }
+// 提示多停一会（老人看得慢）
+function toast(msg, ms){ var t=document.querySelector('.toast'); if(!t){ t=document.createElement('div'); t.className='toast'; document.body.appendChild(t);} t.textContent=msg; t.hidden=false; t.classList.toggle('long', !!(ms&&ms>4000)); clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.hidden=true; },ms||4000); }
 function ago(iso){ var m=Math.floor((Date.now()-new Date(iso).getTime())/60000); if(m<1) return '刚刚'; if(m<60) return m+' 分钟前'; var d=localDate(new Date(iso)); if(d===today()) return '今天 '+new Date(iso).toTimeString().slice(0,5); if(d===addDays(today(),-1)) return '昨天'; return weekday(d); }
 function tzName(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone||''; }catch(e){ return ''; } }
 function store(k,v){ try{ if(v===null) localStorage.removeItem(k); else localStorage.setItem(k,v);}catch(e){} }
@@ -464,7 +553,11 @@ function voiceCapture(o){ // o: {btn, status, input, onText}
   keyboardDictation(o,'');
 }
 function keyboardDictation(o,prefix){ if(o.input){ o.input.value=''; o.input.focus(); } o.status.textContent=(prefix||'')+'请点键盘上的 🎤 话筒键说，说完点旁边的按钮'; }
-function setRec(o,on){ o.btn.classList.toggle('listening',on); o.btn.textContent=on?'⏹':'🎤'; }
+function setRec(o,on){
+  o.btn.classList.toggle('listening',on);
+  if(o.btn.classList.contains('vbig')){ if(!o.btn.getAttribute('data-html')) o.btn.setAttribute('data-html', o.btn.innerHTML); o.btn.innerHTML=on?'<b>⏹ 说完了，点一下</b><small>正在听…最长一分钟</small>':o.btn.getAttribute('data-html'); return; }
+  o.btn.textContent=on?'⏹':(o.btn.getAttribute('data-label')||'🎤');
+}
 function recordAndTranscribe(o){
   if(recorder){ if(recorder.state==='recording') recorder.stop(); return; }
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
@@ -484,7 +577,7 @@ function recordAndTranscribe(o){
         .catch(function(e){ o.status.textContent=(e&&e.message)||'识别失败，请再试一次'; });
     };
     rec.start(); setRec(o,true); o.status.textContent='正在听…说完再点一下 ⏹';
-    setTimeout(function(){ if(recorder===rec&&rec.state==='recording') rec.stop(); },15000);
+    setTimeout(function(){ if(recorder===rec&&rec.state==='recording') rec.stop(); },60000);   // 妈妈一句话里事情多，给足一分钟
   }).catch(function(){ keyboardDictation(o,'没有麦克风权限。'); });
 }
 // 把录音解码后压成 16k 单声道 WAV
@@ -565,10 +658,10 @@ function render(){
   if(uiBusy()){ renderPending=true; return; }
   renderPending=false;
   $('dateLine').textContent=dateLabel(today()).replace('今天 ','');
-  renderMorning(); renderDinner(); renderOrder(); renderBreakfast(); renderShop(); renderRecipes();
+  renderToday(); renderDays(); renderShop(); renderRecipes(); renderVoiceBoxes();
   updateNavBadge(); renderHbBox(); renderInbox(); renderCheer(); renderWho(); renderPushCard();
   if(role){ $('btnProfile').hidden=false; $('btnProfile').innerHTML=av(role); }
-  $('btnOrderSuggest').hidden=!state.ai; $('btnMenuSuggest').hidden=!state.ai;
+  $('btnMenuSuggest').hidden=!state.ai;
 }
 document.addEventListener('focusout', function(){ setTimeout(function(){ if(renderPending&&!uiBusy()) render(); }, 150); });
 
@@ -585,21 +678,10 @@ function morningHtml(){
     body='<div class="pics'+(ds.length>1?' multi':'')+'">'+(ds.length?ds.map(function(d){ return picHtml(d, ds.length>1); }).join(''):'<div class="pic"><span class="emoji">🍽️</span></div>')+'</div>';
     var ns=ds.length?ds.map(function(d){ return d.name; }):[name];
     speakText=when+'是'+(ns.length>1?ns.slice(0,-1).join('、')+'和'+ns[ns.length-1]:ns[0]);
-  } else { name=FALLBACK_NAME; sub=loaded?'没选，就做这个':'正在连接…'; body='<div class="pics"><div class="pic"><span class="emoji">'+FALLBACK_EMOJI+'</span></div></div>'; speakText=when+'是'+FALLBACK_NAME; }
+  } else { name='还没人选'; sub=loaded?'早上 '+(state.autoPickHour||6)+' 点还没人选，就随便定一个':'正在连接…'; body='<div class="pics"><div class="pic"><span class="emoji">🍳</span></div></div>'; speakText=when+'还没人选'; }
   return { html: body+'<div class="name">'+esc(name)+'</div>'+(sub?'<div class="sub">'+esc(sub)+'</div>':''), name:name };
 }
-function renderMorning(){
-  var m=morningHtml(); $('morningCard').innerHTML=m.html; $('bfDate').textContent=dateLabel(targetDate());
-  // 下午 1 点以后，妈妈关心的是晚饭：晚饭那块挪到上面
-  var sec=$('todayBody'), first=sec.firstElementChild;
-  var isDinnerFirst = first && first.id==='dnSec';
-  if(dinnerFirst()!==isDinnerFirst){
-    var bf=[$('bfSec'),$('morningCard')], dn=[$('dnSec'),$('dinnerBoard'),$('cookCard'),$('chooser')];
-    (dinnerFirst()?dn.concat(bf):bf.concat(dn)).forEach(function(el){ sec.appendChild(el); });
-  }
-}
-
-// 晚饭（妈妈的今天页）
+// 晚饭：谁回来、想吃什么、做什么
 function dinnerStatus(plan, who){
   var r=plan&&plan.replies?plan.replies[who]:null, late=plan&&plan.date===today()&&new Date().getHours()>=DINNER_DEFAULT_HOUR;
   if(r&&r.home===true) return {k:'yes',t:'回来吃',s:'回来吃'};
@@ -612,47 +694,88 @@ function openWishesOf(who){ return (state.wishes||[]).filter(function(w){ return
 var UNSURE='还没想好';
 function isUnsure(plan){ return !!(plan&&plan.cook&&!(plan.cook.dishIds||[]).length&&plan.cook.text===UNSURE); }
 function cookNames(plan){ if(!plan||!plan.cook||isUnsure(plan)) return ''; var ns=(plan.cook.dishIds||[]).map(dishById).filter(Boolean).map(function(d){ return d.name; }); if(plan.cook.text) ns.push(plan.cook.text); return ns.join('＋'); }
-var dinnerSpeak='';
-function renderDinner(){
-  var days=planDays(), plan=days[0], d0=plan.date, lab0=nightLabel(d0);
-  $('dnDate').textContent=lab0+' · '+dateLabel(d0).replace(/^今天 |^明天 /,'');
-  var n=0, lines=[];
-  var rows=MEMBERS.map(function(who){
-    var st=dinnerStatus(plan,who); if(st.k==='yes') n++;
-    var ws=openWishesOf(who).map(function(w){ var d=dishById(w.dishId); return d?{d:d,n:d.name,hb:w.hb||0,m:w.hbMsg||''}:null; }).filter(Boolean);
-    lines.push(PEOPLE[who].name+st.t+(ws.length?'，想吃'+ws.map(function(x){ return x.n; }).join('、'):''));
-    return '<div class="person"><span class="who">'+av(who)+' '+esc(PEOPLE[who].name)+'</span><span class="st '+st.k+'">'+st.t+'</span><span class="pw">'+(ws.length?'想吃 '+ws.map(function(x){ return dishLink(x.d,true)+(x.hb?' '+hbHtml(x.hb,x.m):''); }).join('、'):'')+'</span></div>';
+// 妈妈：今天吃什么。一句话入口在最上面；明早一行；今晚一张卡；这几天一天一行；红包、动态各一行
+var dinnerSpeak='', declineArmed=null;
+function cookNamesFull(p){ var c=cookNames(p); if(p&&p.cook&&p.cook.pending) c=(c?c+'＋':'')+p.cook.pending+'（还没定怎么做）'; return c; }
+function homeCount(plan){ var n=0, ws=[]; MEMBERS.forEach(function(m){ if(dinnerStatus(plan,m).k==='yes'){ n++; ws.push(PEOPLE[m].name); } }); return {n:n, who:ws}; }
+// 心愿按菜合起来：谁想吃、等了几天、红包
+function wishGroups(){
+  var g={}, order=[];
+  (state.wishes||[]).forEach(function(w){ if(w.status==='done'||!PEOPLE[w.who]) return; var d=dishById(w.dishId); if(!d) return;
+    var x=g[d.id]; if(!x){ x=g[d.id]={d:d, who:[], wids:[], days:0, hb:0, msg:'', planned:w.plannedFor||''}; order.push(d.id); }
+    if(x.who.indexOf(PEOPLE[w.who].name)<0) x.who.push(PEOPLE[w.who].name); x.wids.push(w.id); x.days=Math.max(x.days,daysSince(w.at)); x.hb+=w.hb||0; if(w.hb&&!x.msg) x.msg=w.hbMsg||''; if(w.plannedFor) x.planned=w.plannedFor; });
+  return order.map(function(id){ return g[id]; }).sort(function(a,b){ return (b.hb-a.hb)||(b.days-a.days); });
+}
+function renderToday(){
+  if(role!=='mom') return;
+  var m=morningHtml(), cur=pickIsCurrent()?state.pick:null;
+  $('bfLine').innerHTML='<span class="k">'+(targetDate()===today()?'今天早饭':'明早早饭')+'</span><b>'+esc(m.name)+'</b>'+(cur&&!cur.auto&&cur.type!=='skip'?'<small>'+(cur.type==='random'?'随便选的':'她们选的')+'</small>':'');
+  var days=planDays(), plan=days[0], d0=plan.date, lab0=nightLabel(d0), hc=homeCount(plan);
+  var cn=cookNamesFull(plan), lines=[];
+  var who=MEMBERS.map(function(w){ var st=dinnerStatus(plan,w); lines.push(PEOPLE[w].name+st.t); return av(w)+' '+esc(PEOPLE[w].name)+' <span class="st '+st.k+'">'+esc(st.s)+'</span>'; }).join('　');
+  // 食材：在菜篮子里了没有；还没定怎么做的一类菜
+  var ds=plan.cook?(plan.cook.dishIds||[]).map(dishById).filter(Boolean):[], miss=[], noIng=[];
+  ds.forEach(function(d){ if(!(d.ingredients||[]).length) noIng.push(d); (d.ingredients||[]).forEach(function(x){ if(!inList(x)&&miss.indexOf(x)<0) miss.push(x); }); });
+  var stat='';
+  if(!plan.done&&ds.length){
+    if(miss.length) stat='<div class="stat" style="color:var(--fg)">还有 '+miss.length+' 样不在菜篮子：'+esc(miss.join('、'))+' <button type="button" class="big-btn ghost sm" data-addmiss="1">都加进去</button></div>';
+    else if(!noIng.length) stat='<div class="stat">✓ 要买的都在菜篮子里了</div>';
+    if(noIng.length) stat+='<div class="stat" style="color:var(--muted)">'+esc(noIng.map(function(d){ return d.name; }).join('、'))+' 还不知道要买什么</div>';
+  }
+  if(plan.cook&&plan.cook.pending&&!plan.done) stat+='<div class="stat" style="color:var(--fg)">「'+esc(plan.cook.pending)+'」还没定怎么做 <button type="button" class="big-btn sm" data-cat="'+esc(plan.cook.pending)+'" data-date="'+d0+'">看看做法</button></div>';
+  var wg=wishGroups();
+  var wrows=wg.map(function(x){
+    var tag=x.planned?'<small>已排在'+esc(nightLabel(x.planned))+'</small>':'';
+    var meta=x.who.join('、')+'想吃'+(x.days?'，等了 '+x.days+' 天':'');
+    var armed=declineArmed===x.d.id;
+    return '<div class="wrow"><div class="n">'+dishLink(x.d,true)+' <small>'+esc(meta)+'</small>'+(x.hb?' '+hbHtml(x.hb,x.msg):'')+' '+tag+'</div>'
+      +(x.planned?'':'<div class="btns3"><button type="button" data-tonight="'+x.d.id+'">'+(plan.done?'明晚做':'今晚做')+'</button><button type="button" class="g" data-other="'+x.d.id+'">改天</button><button type="button" class="r'+(armed?' confirm':'')+'" data-decline="'+x.d.id+'">'+(armed?'确定？告诉'+esc(x.who.join('和')):'做不了')+'</button></div>')+'</div>';
   }).join('');
-  $('dinnerBoard').innerHTML='<p class="count">'+(loaded?('回来吃的：'+n+' 人'):'…')+'<small>不算妈妈。下午 5 点还没说的算回来吃。点菜名看食材</small></p>'+rows;
-  Array.prototype.forEach.call($('dinnerBoard').querySelectorAll('[data-dish]'), function(b){ b.onclick=function(){ openDish(Number(b.getAttribute('data-dish'))); }; });
-  var cn=cookNames(plan);
-  var forWho=[], forHb=0, forMsg=''; if(plan.cook){ (plan.cook.dishIds||[]).forEach(function(id){ (state.wishes||[]).forEach(function(w){ if(w.dishId===id&&w.status!=='done'){ if(forWho.indexOf(PEOPLE[w.who].name)<0) forWho.push(PEOPLE[w.who].name); forHb+=w.hb||0; if(w.hb&&!forMsg) forMsg=w.hbMsg||''; } }); }); }
-  function materials(){
-    if(!plan.cook) return '';
-    var ds=(plan.cook.dishIds||[]).map(dishById).filter(Boolean), miss=[], noIng=[];
-    ds.forEach(function(d){ if(!(d.ingredients||[]).length) noIng.push(d.name); (d.ingredients||[]).forEach(function(x){ if(!inList(x)&&miss.indexOf(x)<0) miss.push(x); }); });
-    if(!miss.length&&!noIng.length) return '';
-    return '<div class="tmr" style="text-align:left"><b>材料</b>'+(miss.length?'：'+esc(miss.join('、'))+' <button type="button" class="big-btn ghost sm" data-goshop="1">去菜篮子点一下</button>':'')+(noIng.length?'<div class="note" style="text-align:left;margin:6px 0 0">'+esc(noIng.join('、'))+' 还没填食材</div>':'')+'</div>';
-  }
-  // 明晚、后天：一行看清 哪天（周几）、做什么、谁回来
-  function dayRow(p){
-    var c=cookNames(p), who=MEMBERS.map(function(m){ return PEOPLE[m].name+dinnerStatus(p,m).s; }).join(' · ');
-    return '<div class="tmr"><div class="dl"><b>'+esc(nightFull(p.date))+'</b>：'+(c?'<b>'+esc(c)+'</b>':isUnsure(p)?'妈妈还没想好':'还没定')+' <button type="button" class="big-btn ghost sm" data-date="'+p.date+'">'+(c?'改':'定一下')+'</button></div><div class="dw">'+esc(who)+'</div></div>';
-  }
-  var canDone = plan.cook && (plan.cook.dishIds||[]).length && !plan.done;
-  var rest=shownDays().slice(1);
-  $('cookCard').innerHTML='<div class="lab">'+esc(nightFull(d0))+' 做</div>'
-    +'<div class="txt'+(cn?'':' none')+'">'+(cn?esc(cn):isUnsure(plan)?'还没想好，想好了再定':'还没定')+'</div>'
-    +(plan.done?'<div class="for">✓ 做好了，辛苦妈妈</div>':forWho.length?'<div class="for">'+esc(forWho.join('和'))+'想吃的 ✓'+(forHb?' '+hbHtml(forHb,forMsg):'')+'</div>':'')
-    +(plan.done?'':materials())
-    +(plan.done?'':'<div class="row">'+(canDone?'<button type="button" class="big-btn primary" data-done="'+d0+'">🍚 做好了</button>':'')+'<button type="button" class="big-btn'+(cn?' ghost':' primary')+'" data-date="'+d0+'"'+(canDone?'':' style="flex-basis:100%"')+'>'+(cn?'换一个':'定'+lab0+'做什么')+'</button></div>')
-    +rest.map(dayRow).join('')
-    +'<button type="button" class="secfold sm" id="foldMoreDaysMom" style="margin-top:10px"></button>';
-  moreDaysBtn($('foldMoreDaysMom'));
-  Array.prototype.forEach.call($('cookCard').querySelectorAll('button[data-date],button[data-goshop],button[data-done]'), function(b){ b.onclick=function(){ if(b.getAttribute('data-goshop')){ showView('shop'); window.scrollTo(0,0); return; } if(b.getAttribute('data-done')){ markDone(b.getAttribute('data-done')); return; } openChooser(b.getAttribute('data-date')); }; });
-  var c1=cookNames(days[1]);
-  dinnerSpeak=lab0+n+'个人回来吃。'+lines.join('。')+'。'+(cn?lab0+'做'+cn.replace(/＋/g,'和'):lab0+(isUnsure(plan)?'还没想好做什么':'还没定做什么'))+(c1?'。'+nightLabel(days[1].date)+'做'+c1.replace(/＋/g,'和'):'');
+  $('tonightCard').innerHTML='<h2>'+esc(lab0)+' <small>'+esc(weekday(d0))+'</small></h2>'
+    +'<div class="who">'+(loaded?'回来吃 '+hc.n+' 人：':'')+who+'</div>'
+    +'<div class="cook-card" style="margin:6px 0 4px"><div class="lab">'+esc(lab0)+'做</div><div class="txt'+(cn?'':' none')+'">'+(cn?esc(cn):isUnsure(plan)?'还没想好':plan.cook&&plan.cook.text===NO_COOK?'不做饭':'还没定')+'</div>'
+    +(plan.done?'<div class="for">✓ 做好了，辛苦妈妈</div>':'')+stat+'</div>'
+    +wrows
+    +(plan.done?'':'<div class="row" style="margin-top:10px">'+(ds.length?'<button type="button" class="big-btn primary" data-done="'+d0+'">🍚 做好了</button>':'')+'<button type="button" class="big-btn ghost" data-date="'+d0+'">'+(cn?'换今晚的菜':'从菜谱里挑今晚的')+'</button></div>');
+  // 这几天：一天一行，不折叠
+  $('daysCard').innerHTML='<h2>这几天 <small>点一天可以改</small></h2>'+days.slice(1).map(function(p){
+    var c=cookNamesFull(p); var t=c||(isUnsure(p)?'还没想好':p.cook&&p.cook.text===NO_COOK?'不做饭':'');
+    return '<button type="button" class="drow" data-date="'+p.date+'"><span>'+esc(nightFull(p.date))+'</span><span'+(t?'':' class="no"')+'>'+esc(t||'还没定')+'</span></button>';
+  }).join('');
+  var all=document.querySelectorAll('#tonightCard [data-dish]');
+  Array.prototype.forEach.call(all, function(b){ b.onclick=function(){ openDishSheet(Number(b.getAttribute('data-dish'))); }; });
+  Array.prototype.forEach.call(document.querySelectorAll('#tonightCard button, #daysCard button'), function(b){
+    if(b.getAttribute('data-dish')) return;
+    b.onclick=function(){
+      var a=function(k){ return b.getAttribute(k); };
+      if(a('data-addmiss')) shopAdd(miss, ds.map(function(d){ return d.name; }).join('、'));
+      else if(a('data-cat')) openCategory(a('data-cat'), a('data-date'));
+      else if(a('data-done')) markDone(a('data-done'));
+      else if(a('data-tonight')){ var dt=plan.done?days[1].date:d0; addToDay(Number(a('data-tonight')), dt); }
+      else if(a('data-other')) openDishSheet(Number(a('data-other')));
+      else if(a('data-decline')){ var id=Number(a('data-decline')); if(declineArmed!==id){ declineArmed=id; renderToday(); setTimeout(function(){ if(declineArmed===id){ declineArmed=null; renderToday(); } },5000); return; } declineArmed=null; declineDish(id,''); }
+      else if(a('data-date')){ var p=planByDate(a('data-date')); if(p&&p.cook&&p.cook.pending&&!(p.cook.dishIds||[]).length) openCategory(p.cook.pending, p.date); else openChooser(a('data-date')); }
+    };
+  });
+  var c1=cookNamesFull(days[1]);
+  dinnerSpeak=lab0+hc.n+'个人回来吃。'+lines.join('。')+'。'+(cn?lab0+'做'+cn.replace(/＋/g,'和'):lab0+'还没定做什么')+(c1?'。'+nightLabel(days[1].date)+'做'+c1.replace(/＋/g,'和'):'');
   renderChooser();
+}
+// 把一道菜加进某天晚饭（原来定的菜留着），食材自动进菜篮子
+function addToDay(dishId, date, extra){
+  var d=dishById(dishId), json={who:role,date:date,dishId:dishId}; if(extra) for(var k in extra) json[k]=extra[k];
+  return api('/api/dinner/add',{method:'POST',json:json}).then(function(r){
+    var msg='✓ '+nightFull(date)+'做 '+(d?d.name:'')+((r.shopAdded||[]).length?'，菜篮子加了 '+r.shopAdded.length+' 样':'');
+    toast(msg, 5000); return loadState().then(function(){ return r; });
+  }).catch(function(e){ toast(e.message||'没排上，请再试一次'); });
+}
+// 妈妈说这道菜这次做不了：告诉点菜的人
+function declineDish(dishId, reason){
+  var ws=(state.wishes||[]).filter(function(w){ return w.dishId===dishId&&w.status!=='done'; }), d=dishById(dishId);
+  var names=ws.map(function(w){ return PEOPLE[w.who]?PEOPLE[w.who].name:''; }).filter(function(x,i,a){ return x&&a.indexOf(x)===i; });
+  return Promise.all(ws.map(function(w){ return api('/api/wishes/'+w.id+'/decline',{method:'POST',json:{reason:reason||''}}); }))
+    .then(function(){ toast('告诉'+names.join('和')+'了：'+(d?d.name:'')+'这次做不了', 5000); return loadState(); })
+    .catch(function(e){ toast(e.message||'没成功，请再试一次'); });
 }
 // 妈妈点「做好了」：当场结算，弹一句暖心话（收到几个红包、谁说了什么）
 var doneBusy=false;
@@ -687,16 +810,20 @@ function renderCheer(){
   el.hidden=false;
   var total=0; fresh.forEach(function(l){ total+=l.hb; });
   var names=fresh.map(function(l){ return l.name; }).filter(function(x,i,a){ return a.indexOf(x)===i; }).join('、');
-  if(role==='mom') el.innerHTML='<h3>🧧 收到红包啦</h3><div class="big">'+hbText(total)+'</div><p>'+esc(names)+' 做得好，'+fresh.map(function(l){ return PEOPLE[l.who].name+'说「'+(l.msg||HB_MSGS[0])+'」'; }).filter(function(x,i,a){ return a.indexOf(x)===i; }).join('，')+'</p><button type="button" class="big-btn primary" id="cheerSeen">知道了</button>';
+  if(role==='mom') el.innerHTML='<div style="display:flex;align-items:center;gap:10px;text-align:left"><div style="flex:1;font-size:20px;line-height:1.4"><b>🧧 收到红包 '+hbText(total)+'</b><br><span style="font-size:17px;color:var(--muted)">'+esc(names)+'，'+esc(fresh.map(function(l){ return PEOPLE[l.who].name+'说「'+(l.msg||HB_MSGS[0])+'」'; }).filter(function(x,i,a){ return a.indexOf(x)===i; }).join('，'))+'</span></div><button type="button" class="big-btn primary sm" id="cheerSeen">知道了</button></div>';
   else el.innerHTML='<h3>🧧 妈妈做了 '+esc(names)+'</h3><p>你包的红包 '+hbText(total)+' 记得在微信发给妈妈，发了在下面点「红包发了」</p><button type="button" class="big-btn ghost" id="cheerSeen">知道了</button>';
   $('cheerSeen').onclick=function(){ store('bf_cheer_seen', String(maxLedgerId())); renderCheer(); };
 }
 // 红包账本（妈妈看）：谁还没发、发了多少、本月一共
 function monthOf(ds){ return String(ds||'').slice(0,7); }
+var hbOpen=false, inboxOpen=false;
 function renderHbBox(){
-  var box=$('hbBox'), l=(state.ledger||[]).filter(function(x){ return PEOPLE[x.who]; });
-  if(role!=='mom'||!l.length){ box.hidden=true; return; }
-  box.hidden=false;
+  var box=$('hbBox'), line=$('hbLine'), l=(state.ledger||[]).filter(function(x){ return PEOPLE[x.who]; });
+  if(role!=='mom'||!l.length){ box.hidden=true; line.hidden=true; return; }
+  var oweSum=l.filter(function(x){ return !x.paidAt; }).reduce(function(a,x){ return a+x.hb; },0);
+  line.hidden=false; line.innerHTML='<span>🧧 红包：'+(oweSum?'还没收到 '+esc(hbText(oweSum)):'都收到了 ✓')+'</span><span>'+(hbOpen?'收起 ▲':'›')+'</span>';
+  line.onclick=function(){ hbOpen=!hbOpen; renderHbBox(); };
+  box.hidden=!hbOpen; if(!hbOpen) return;
   var owe=l.filter(function(x){ return !x.paidAt; }), paid=l.filter(function(x){ return x.paidAt; });
   var byWho={}; owe.forEach(function(x){ var b=byWho[x.who]||(byWho[x.who]={n:0,sum:0}); b.n++; b.sum+=x.hb; });
   var month=0, all=0, tm=monthOf(today()); l.forEach(function(x){ all+=x.hb; if(monthOf(x.date)===tm) month+=x.hb; });
@@ -733,7 +860,14 @@ function renderInbox(){
   var mine=$(role==='mom'?'inboxBox':'inboxBoxOrder'), other=$(role==='mom'?'inboxBoxOrder':'inboxBox'); if(other) other.hidden=true;
   if(!mine||!role){ return; }
   var l=(state.inbox||[]).filter(function(x){ return x.to===role; }).slice(-8).reverse();
-  if(!l.length){ mine.hidden=true; return; }
+  if(!l.length){ mine.hidden=true; $('inboxLine').hidden=true; return; }
+  // 妈妈那边收成一行：最新一条，点开看全部
+  if(role==='mom'){
+    var line=$('inboxLine'), nNew=l.filter(function(x){ return x.id>inboxSeenAtOpen; }).length;
+    line.hidden=false; line.innerHTML='<span>📣 '+(nNew?'<b style="color:var(--bad)">新</b> ':'')+esc(String(l[0].body).slice(0,28))+'</span><span>'+(inboxOpen?'收起 ▲':'›')+'</span>';
+    line.onclick=function(){ inboxOpen=!inboxOpen; renderInbox(); };
+    if(!inboxOpen){ mine.hidden=true; return; }
+  }
   mine.hidden=false;
   var maxId=0; l.forEach(function(x){ if(x.id>maxId) maxId=x.id; });
   mine.innerHTML='<h3>📣 最近的动态 <small style="font-weight:400">手机通知说的都在这</small></h3>'+l.map(function(x){ var isNew=x.id>inboxSeenAtOpen; return '<div class="inbox-row'+(isNew?' new':'')+'"><span class="tx">'+(isNew?'<span class="newtag">新</span>':'')+esc(x.body)+'</span><span class="tm">'+esc(ago(x.at))+'</span></div>'; }).join('');
@@ -765,12 +899,11 @@ function renderChooser(){
     +(wishChips?'<h4>他们想吃</h4><div class="chips big">'+wishChips+'</div>':'<p class="note" style="text-align:left">心愿单是空的</p>')
     +(momChips?'<h4>拿手菜</h4><div class="chips">'+momChips+'</div>':'')
     +(otherChips?'<h4>其他</h4><div class="chips">'+otherChips+'</div>':'')
-    +'<h4>别的</h4><div class="add-row"><input id="chooserInput" placeholder="说一句或打字" autocomplete="off" value="'+esc(chooser.text||'')+'"><button type="button" id="chooserVoice" class="mic">🎤</button></div><p class="note" id="chooserStatus" style="text-align:left"></p>'
+    +'<p class="note" style="text-align:left">菜谱里没有的菜，按最上面的「按一下，说一句」说就行</p>'
     +'<div class="row" style="margin-top:12px"><button type="button" class="big-btn primary" id="chooserOk">就这么定</button><button type="button" class="big-btn danger" id="chooserNo">不做饭</button><button type="button" class="big-btn ghost" id="chooserUndo">没想好</button><button type="button" class="big-btn ghost" id="chooserCancel">取消</button></div>';
   Array.prototype.forEach.call(box.querySelectorAll('.chips button'), function(b){ b.onclick=function(){ var id=Number(b.getAttribute('data-id')), k=chooser.sel.indexOf(id); if(k>=0) chooser.sel.splice(k,1); else chooser.sel.push(id); renderChooser(); }; });
-  $('chooserVoice').onclick=function(){ voiceCapture({btn:$('chooserVoice'),status:$('chooserStatus'),input:$('chooserInput'),onText:function(t){ $('chooserInput').value=cleanName(t); }}); };
   $('chooserOk').onclick=function(){
-    var text=$('chooserInput').value.trim(); var sel=chooser.sel.slice();
+    var text=''; var sel=chooser.sel.slice();
     if(!sel.length&&!text){ toast('先点一个菜'); return; }
     var p=Promise.resolve();
     if(text){ p=api('/api/dishes',{method:'POST',json:{name:cleanName(text)||text,cat:'dinner',mom:true,by:'mom'}}).then(function(r){ if(r.dish&&sel.indexOf(r.dish.id)<0) sel.push(r.dish.id); }); }
@@ -784,63 +917,23 @@ function renderChooser(){
   $('chooserUndo').onclick=function(){ chooser=null; act(api('/api/dinner/cook',{method:'POST',json:{date:date,dishIds:[],text:UNSURE}}),label+'先不定，大家会看到你还没想好'); };
   $('chooserCancel').onclick=function(){ chooser=null; renderChooser(); };
 }
-// 下午 1 点以后先关心晚饭：页面顺序和朗读顺序都跟着这个
-function dinnerFirst(){ return new Date().getHours()>=13; }
 var speakingNow=false;
 function speakBtn(label){ $('btnSpeak').textContent=label; }
 $('btnSpeak').onclick=function(){
-  if(speakingNow){ stopSpeak(); speakingNow=false; speakBtn('🔊 读给我听'); return; }
-  var text=dinnerFirst() ? dinnerSpeak+'。'+speakText : speakText+'。'+dinnerSpeak;
+  if(speakingNow){ stopSpeak(); speakingNow=false; speakBtn('🔊 把今天的安排读给我听'); return; }
+  var text=speakText+'。'+dinnerSpeak;
   var box=$('speakBox'); box.hidden=false; box.innerHTML='<div class="lab">读的是：</div>'+esc(text.replace(/。+/g,'。'))+'<p class="note" id="speakNote" style="text-align:left;margin:8px 0 0"></p>';
   speakingNow=true; speakBtn('⏹ 正在读…点一下停');
   speak(text, function(st){
     var n=$('speakNote'); if(!n) return;
     if(st==='speaking') n.textContent='';
-    else if(st==='done'){ speakingNow=false; speakBtn('🔊 读给我听'); }
+    else if(st==='done'){ speakingNow=false; speakBtn('🔊 把今天的安排读给我听'); }
     else if(st==='silent') n.textContent='没听到声音？看看手机侧面的静音键和音量。上面的字就是要读的内容';
-    else if(st==='error'){ speakingNow=false; speakBtn('🔊 读给我听'); n.textContent='这个手机朗读出错了。上面的字就是要读的内容'; }
-    else if(st==='nosupport'){ speakingNow=false; speakBtn('🔊 读给我听'); n.textContent='这个手机不能朗读，上面的字就是内容'; }
+    else if(st==='error'){ speakingNow=false; speakBtn('🔊 把今天的安排读给我听'); n.textContent='这个手机朗读出错了。上面的字就是要读的内容'; }
+    else if(st==='nosupport'){ speakingNow=false; speakBtn('🔊 把今天的安排读给我听'); n.textContent='这个手机不能朗读，上面的字就是内容'; }
   });
 };
 
-// 点菜（女儿 / 小陈）
-function renderOrder(){
-  if(MEMBERS.indexOf(role)<0) return;
-  var days=shownDays();
-  renderMyHb();
-  // 近三天都能说：回来吃 / 不回来 / 没想好；更远的折在「再往后几天」里
-  moreDaysBtn($('foldMoreDays'));
-  $('homeRows').innerHTML=days.map(function(p){
-    var r=p.replies?p.replies[role]:null, v=r?(r.home===true?'1':r.home===false?'0':'x'):'';
-    function b(val,cls,txt){ return '<button type="button" class="'+cls+(v===val?' on':'')+'" data-date="'+p.date+'" data-home="'+val+'">'+txt+'</button>'; }
-    return '<div class="hrow"><div class="hl">'+esc(nightLabel(p.date))+' <small>'+esc(dateLabel(p.date).replace(/^今天 |^明天 /,''))+'</small></div><div class="home-row three">'+b('1','yes','🏠 回来吃')+b('0','no','🚶 不回来')+b('x','maybe','🤔 没想好')+'</div></div>';
-  }).join('');
-  Array.prototype.forEach.call($('homeRows').querySelectorAll('button'), function(b){ b.onclick=function(){ var h=b.getAttribute('data-home'); act(api('/api/dinner/reply',{method:'POST',json:{who:role,date:b.getAttribute('data-date'),home:h==='1'?true:h==='0'?false:null}}),'告诉妈妈了'); }; });
-  $('momSaid').innerHTML='<h3>妈妈说</h3>'+days.map(function(p,i){ var c=cookNames(p); return '<div style="font-size:'+(i?22:30)+'px;font-weight:'+(i?400:800)+';'+(i?'color:var(--muted);margin-top:6px':'')+'">'+esc(nightFull(p.date))+'：'+(c?esc(c)+(p.done?' <span style="color:var(--good);font-size:20px">✓ 做好了</span>':''):'<span style="color:var(--muted);font-weight:400;font-size:22px">'+(isUnsure(p)?'妈妈还没想好':'还没定')+'</span>')+'</div>'; }).join('');
-  // 菜库里点：红包多的在前，其次妈妈的拿手菜
-  var mine={}; openWishesOf(role).forEach(function(w){ mine[w.dishId]=w; });
-  var list=dishesOf('dinner').slice().sort(function(a,b){ return (hbTotal(b.id)-hbTotal(a.id)) || ((b.mom?1:0)-(a.mom?1:0)); });
-  var grid=$('orderGrid');
-  if(!loaded) grid.innerHTML='<div class="empty">正在打开…</div>';
-  else if(!list.length) grid.innerHTML='<div class="empty">菜单里还没有正餐，先在下面说一道想吃的</div>';
-  else grid.innerHTML=list.map(function(d){ var w=mine[d.id], hb=hbTotal(d.id); var meta=w&&w.status==='planned'&&w.plannedFor?'妈妈安排在'+nightLabel(w.plannedFor):(d.mom?'⭐ 妈妈的拿手菜':''); return '<button type="button" class="card'+(w?' selected':'')+'" data-id="'+d.id+'" aria-pressed="'+(w?'true':'false')+'">'+picHtml(d)+'<div class="name">'+esc(d.name)+'</div>'+(w?'<div class="tick">✓ 已点</div>':'')+(hb?'<div class="meta">'+hbHtml(hb,hbMsgOf(d.id))+'</div>':'')+(meta?'<div class="meta">'+esc(meta)+'</div>':'')+'</button>'; }).join('');
-  Array.prototype.forEach.call(grid.querySelectorAll('.card'), function(el){ el.onclick=function(){ var id=Number(el.getAttribute('data-id')), w=mine[id], d=dishById(id); if(w) act(api('/api/wishes/'+w.id+'/remove',{method:'POST'}),'取消了'); else orderWish({who:role,dishId:id}, d?d.name:''); }; });
-  // 心愿单：没做的在前，红包多的在前
-  var ws=(state.wishes||[]).filter(function(w){ return PEOPLE[w.who]&&dishById(w.dishId); }).sort(function(a,b){ return ((a.status==='done'?1:0)-(b.status==='done'?1:0)) || ((b.hb||0)-(a.hb||0)) || (a.at<b.at?1:-1); });
-  $('wishList').innerHTML=ws.length?ws.map(function(w){ var d=dishById(w.dishId), me=w.who===role, done=w.status==='done';
-    var st=done?'做过了 '+(w.doneAt?weekday(w.doneAt):''):w.status==='planned'?'妈妈安排在'+nightLabel(w.plannedFor||''):'等妈妈安排'+(daysSince(w.at)?'，等了'+daysSince(w.at)+'天':'');
-    var btns='';
-    if(me&&!done) btns='<button type="button" class="x red" data-hb="'+w.id+'">'+(w.hb?'改红包':'🧧 包红包')+'</button><button type="button" class="x" data-wid="'+w.id+'">取消</button>';
-    else if(me&&done&&w.hb&&!w.hbPaid) btns='<button type="button" class="x go" data-paid="'+w.id+'">红包发了 ✓</button>';
-    return '<div class="wish'+(done&&!(me&&w.hb&&!w.hbPaid)?' done':'')+'"><span class="n">'+dishLink(d)+(w.hb?' '+hbHtml(w.hb,w.hbMsg):'')+(me&&done&&w.hb&&!w.hbPaid?'<small>妈妈做了，记得在微信给妈妈发红包</small>':done&&w.hb&&w.hbPaid?'<small>红包已发</small>':'')+'</span><span class="w">'+av(w.who)+' '+esc(PEOPLE[w.who].name)+' · '+st+'</span>'+btns+'</div>'; }).join('')
-    :'<p class="note">还没人点菜</p>';
-  Array.prototype.forEach.call($('wishList').querySelectorAll('button'), function(b){ b.onclick=function(){
-    if(b.getAttribute('data-dish')) openDish(Number(b.getAttribute('data-dish')));
-    else if(b.getAttribute('data-hb')) openHb(Number(b.getAttribute('data-hb')));
-    else if(b.getAttribute('data-paid')) act(api('/api/wishes/'+b.getAttribute('data-paid')+'/update',{method:'POST',json:{hbPaid:true}}),'好，妈妈会看到');
-    else act(api('/api/wishes/'+b.getAttribute('data-wid')+'/remove',{method:'POST'}),'取消了');
-  }; });
-}
 // 点一道菜。点好了顺手问一句要不要给妈妈包个红包（按家里人的意见：点菜时就问，不用再跑去心愿单）
 function orderWish(json, name){
   return api('/api/wishes',{method:'POST',json:json}).then(function(r){
@@ -856,6 +949,7 @@ function orderWish(json, name){
 function dishLink(d, noEmoji){ return '<button type="button" class="dlink" data-dish="'+d.id+'">'+(noEmoji?'':esc(d.emoji||'')+' ')+esc(d.name)+'<span class="go">›</span></button>'; }
 function openDish(id){
   var d=dishById(id); if(!d) return;
+  if(role==='mom'){ openDishSheet(id); return; }
   if(menuFold[d.cat]){ menuFold[d.cat]=false; store('bf_fold_'+d.cat, null); }
   expandedId=id; pendingDelete=null;
   showView('recipes'); renderRecipes();
@@ -887,52 +981,66 @@ function openHb(wishId, justOrdered){
   };
   $('hbNone').onclick=function(){ closeSheet(); if(!w.hb) return; act(api('/api/wishes/'+wishId+'/update',{method:'POST',json:{hb:0}}),'红包取消了'); };
 }
-$('otherForm').onsubmit=function(e){ e.preventDefault(); var v=cleanName($('otherInput').value)||$('otherInput').value.trim(); if(!v) return; $('otherInput').value=''; $('otherInput').blur(); orderWish({who:role,name:v}, v); };
-$('btnOtherVoice').onclick=function(){ voiceCapture({btn:$('btnOtherVoice'),status:$('otherStatus'),input:$('otherInput'),onText:function(t){ var v=cleanName(t); if(v){ $('otherInput').value=''; orderWish({who:role,name:v}, v); } }}); };
 
-// AI 推荐新菜（点菜页：直接点；菜单页：加进菜单）
-var suggestions={order:[],menu:[]}, sugFold={order:false,menu:false};
-function loadSuggest(where, cat){
-  var st=$(where+'SuggestStatus'); st.textContent='AI 正在想…';
-  api('/api/suggest',{method:'POST',json:{cat:cat}}).then(function(r){ sugFold[where]=false; suggestions[where]=(r.items||[]).map(function(x){ return {name:x.name,ingredients:x.ingredients||[],cat:cat}; }); st.textContent=suggestions[where].length?'':'AI 没想出新的，再点一次'; renderSuggest(where); })
-    .catch(function(e){ st.textContent=e.message||'AI 出错了，请再试一次'; });
-}
-function renderSuggest(where){
-  var box=$(where+'Suggest'), l=suggestions[where], f=sugFold[where];
-  if(!l.length){ box.innerHTML=''; return; }
-  // 推荐的结果可以折起来，也可以一道一道删，或者全部清掉
-  box.innerHTML='<div class="sughead"><button type="button" class="secfold" data-act="fold"><span class="arr">'+(f?'▶':'▼')+'</span>AI 推荐 <small>'+l.length+' 道'+(f?'，点开看':'')+'</small></button><button type="button" class="big-btn ghost sm" data-act="clear">全部清掉</button></div>'
-    +(f?'':l.map(function(x,i){ return '<div class="wish"><span class="n">'+esc(x.name)+(x.ingredients.length?'<small>'+esc(x.ingredients.slice(0,6).join('、'))+'</small>':'')+'</span><button type="button" class="x go" data-i="'+i+'">'+(where==='order'?'想吃':'加进菜单')+'</button><button type="button" class="x" data-rm="'+i+'" aria-label="不要这道">✕ 不要</button></div>'; }).join(''));
-  Array.prototype.forEach.call(box.querySelectorAll('button'), function(b){ b.onclick=function(){
-    var a=b.getAttribute('data-act');
-    if(a==='fold'){ sugFold[where]=!sugFold[where]; renderSuggest(where); return; }
-    if(a==='clear'){ suggestions[where]=[]; $(where+'SuggestStatus').textContent=''; renderSuggest(where); return; }
-    if(b.getAttribute('data-rm')!=null){ l.splice(Number(b.getAttribute('data-rm')),1); renderSuggest(where); return; }
-    var x=l.splice(Number(b.getAttribute('data-i')),1)[0]; renderSuggest(where); if(!x) return;
-    var p=api('/api/dishes',{method:'POST',json:{name:x.name,cat:x.cat,ingredients:x.ingredients,mom:false,by:role}});
-    if(where==='order') p.then(function(r){ return orderWish({who:role,dishId:r.dish.id}, x.name); }).catch(function(e){ toast(e.message||'没成功，请再试一次'); });
-    else act(p,'加进菜单了：'+x.name);
-  }; });
-}
-$('btnOrderSuggest').onclick=function(){ loadSuggest('order','dinner'); };
-$('btnMenuSuggest').onclick=function(){ loadSuggest('menu',newCat); };
+$('btnMenuSuggest').onclick=function(){ openIdeas(role==='mom'?recipeCat:newCat); };
 
-// 早饭（女儿 / 小陈）
-function renderBreakfast(){
-  var td=targetDate(), cur=pickIsCurrent()?state.pick:null, list=dishesOf('breakfast');
-  var m=morningHtml();
-  $('bfAnswer').innerHTML='<div style="font-size:19px;color:var(--muted)">'+(td===today()?'今早':'明早')+'早饭</div><div style="font-size:34px;font-weight:800">'+esc(m.name)+'</div>';
-  $('pickHint').textContent='点图片选'+(td===today()?'今早':'明早')+'的早饭，可以选几样，再点一下取消。早上 '+(state.autoPickHour||6)+' 点还没选就自动随机';
-  var grid=$('pickGrid');
-  if(!loaded) grid.innerHTML='<div class="empty">正在打开…</div>';
-  else if(!list.length) grid.innerHTML='<div class="empty">菜单里还没有早饭，到「菜谱本」加</div>';
-  else { var selIds=pickedIds(cur); grid.innerHTML=list.map(function(d){ var sel=selIds.indexOf(d.id)>=0; return '<button type="button" class="card'+(sel?' selected':'')+'" data-id="'+d.id+'" aria-pressed="'+(sel?'true':'false')+'">'+picHtml(d)+'<div class="name">'+esc(d.name)+'</div>'+(sel?'<div class="tick">✓ 就吃这个</div>':'')+'</button>'; }).join(''); }
-  Array.prototype.forEach.call(grid.querySelectorAll('.card'), function(el){ el.onclick=function(){ var ids=pickedIds(cur), id=Number(el.getAttribute('data-id')), k=ids.indexOf(id); if(k>=0) ids.splice(k,1); else ids.push(id); act(api('/api/pick',{method:'POST',json:{type:'dishes',ids:ids,date:td,who:role}})).then(function(r){ if(r) toast(r.pick?'选好了：'+r.pick.resolvedName:'取消了'); }); }; });
-  $('pickStatus').textContent=cur?(cur.type==='skip'?'已选好：不吃':'已选好：'+cur.resolvedName+(cur.auto?'（自动随机的）':cur.type==='random'?'（随便选的）':'')):(loaded?'还没选，不选就是'+FALLBACK_NAME:'');
-  $('btnRandom').disabled=!list.length;
+// 女儿 / 小陈：这几天。一天一张卡，早饭、晚饭同一个样子；每顿写着谁定
+var pickFor=null;   // 从「这几天」点「去菜谱挑」：{cat, date}，菜谱页顶上显示「给哪一顿挑」
+function goPick(cat, date){ pickFor={cat:cat, date:date}; menuFold[cat]=false; menuFold[cat==='dinner'?'breakfast':'dinner']=true; showView('recipes'); render(); window.scrollTo(0,0); }
+function breakfastMeal(){
+  var td=targetDate(), cur=pickIsCurrent()?state.pick:null, ids=pickedIds(cur);
+  var v = cur&&cur.type==='skip' ? '不做早饭' : ids.length ? ids.map(dishById).filter(Boolean).map(function(d){ return d.name; }).join('＋') : '';
+  var by = !cur ? '' : cur.type==='skip' ? '' : cur.auto ? '早上自动随便定的' : cur.type==='random' ? '随便选的' : '';
+  return '<div class="meal"><div class="mt">早饭 <span class="whochip kids">你们定</span></div>'
+    +'<div class="mr"><span class="k">吃什么</span><span class="v">'+(v?esc(v)+(by?' <small>'+esc(by)+'</small>':''):'<small>还没选</small>')+'</span><button type="button" class="go" data-pickbf="'+td+'">去菜谱挑</button></div>'
+    +'<div class="mr"><span class="k"></span><span class="seg"><button type="button" data-bfrandom="1">随便</button><button type="button" class="'+(cur&&cur.type==='skip'?'on no':'')+'" data-bfskip="1">不做早饭</button></span></div>'
+    +'<div class="mr res"><span class="k">定了</span><span class="v">'+(v?esc(v):'<small>没人选的话，早上 '+(state.autoPickHour||6)+' 点随便定一个</small>')+'</span></div></div>';
 }
-$('btnRandom').onclick=function(){ act(api('/api/pick',{method:'POST',json:{type:'random',date:targetDate(),who:role}})).then(function(r){ if(r&&r.pick) toast('随便选了：'+r.pick.resolvedName); }); };
-$('btnSkip').onclick=function(){ act(api('/api/pick',{method:'POST',json:{type:'skip',date:targetDate(),who:role}}),'好，早饭不吃'); };
+function dinnerMeal(p, compact){
+  var r=p.replies?p.replies[role]:null, v=r?(r.home===true?'1':r.home===false?'0':'x'):'';
+  function b(val,cls,txt){ return '<button type="button" class="'+(v===val?'on '+cls:'')+'" data-date="'+p.date+'" data-home="'+val+'">'+txt+'</button>'; }
+  var mine=openWishesOf(role).filter(function(w){ return !w.plannedFor||w.plannedFor===p.date; });
+  var c=cookNamesFull(p), res = c ? esc(c)+(p.done?' <small>✓ 做好了</small>':' <small>妈妈定的</small>') : '<small>'+(isUnsure(p)?'妈妈还没想好':p.cook&&p.cook.text===NO_COOK?'不做饭':'妈妈还没定')+'</small>';
+  var html='<div class="meal"><div class="mt">晚饭 <span class="whochip">妈妈定</span></div>'
+    +'<div class="mr"><span class="k">我</span><span class="seg">'+b('1','yes','回来吃')+b('0','no','不回来')+b('x','maybe','没想好')+'</span></div>';
+  if(!compact) html+='<div class="mr"><span class="k">我想吃</span><span class="v">'+(mine.length?mine.map(function(w){ var d=dishById(w.dishId); return d?'<button type="button" class="wchip" data-wish="'+w.id+'">'+esc(d.name)+(w.hb?' 🧧':'')+'</button>':''; }).join(''):'<small>还没点</small>')+'</span><button type="button" class="go" data-pickdn="'+p.date+'">去菜谱挑</button></div>';
+  return html+'<div class="mr res"><span class="k">定了</span><span class="v">'+res+'</span></div></div>';
+}
+function renderDays(){
+  if(MEMBERS.indexOf(role)<0) return;
+  renderMyHb();
+  var days=planDays(), td=targetDate();
+  function card(p, i){
+    var bf = td===p.date ? breakfastMeal() : '';
+    var title=(p.date===today()?'今天':p.date===addDays(today(),1)?'明天':p.date===addDays(today(),2)?'后天':weekday(p.date));
+    return '<div class="dcard"><h2>'+esc(title)+' <small>'+esc(dateLabel(p.date).replace(/^今天 |^明天 /,''))+'</small></h2>'+bf+dinnerMeal(p, i>=SHOW_DAYS)+'</div>';
+  }
+  // 早饭的那天比晚饭早一天的情况（晚上 8 点后，今晚已过）：早饭单独一张卡放最前
+  var lead = (days[0].date!==td && td<days[0].date) ? '<div class="dcard"><h2>'+(td===today()?'今天':'明天')+'</h2>'+breakfastMeal()+'</div>' : '';
+  $('daysList').innerHTML=lead+days.slice(0,SHOW_DAYS).map(card).join('');
+  moreDaysBtn($('foldMoreDays'));
+  $('moreDaysList').innerHTML=moreDays?days.slice(SHOW_DAYS).map(function(p,k){ return card(p,SHOW_DAYS+k); }).join(''):'';
+  Array.prototype.forEach.call(document.querySelectorAll('#view-days button'), function(b){
+    var a=function(k){ return b.getAttribute(k); };
+    if(a('data-home')!=null) b.onclick=function(){ var h=a('data-home'); act(api('/api/dinner/reply',{method:'POST',json:{who:role,date:a('data-date'),home:h==='1'?true:h==='0'?false:null}}),'告诉妈妈了'); };
+    else if(a('data-pickbf')) b.onclick=function(){ goPick('breakfast', a('data-pickbf')); };
+    else if(a('data-pickdn')) b.onclick=function(){ goPick('dinner', a('data-pickdn')); };
+    else if(a('data-bfrandom')) b.onclick=function(){ act(api('/api/pick',{method:'POST',json:{type:'random',date:targetDate(),who:role}})).then(function(r){ if(r&&r.pick) toast('随便选了：'+r.pick.resolvedName); }); };
+    else if(a('data-bfskip')) b.onclick=function(){ act(api('/api/pick',{method:'POST',json:{type:'skip',date:targetDate(),who:role}}),'好，不做早饭'); };
+    else if(a('data-wish')) b.onclick=function(){ openWishSheet(Number(a('data-wish'))); };
+  });
+}
+// 点了的菜：包红包、不想吃了
+function openWishSheet(wid){
+  var w=wishById(wid); if(!w) return; var d=dishById(w.dishId);
+  openSheet('<h3>'+esc(d?d.name:'')+'</h3><p class="hint" style="text-align:left">'+(w.plannedFor?'妈妈排在'+esc(nightLabel(w.plannedFor)):'等妈妈安排')+(w.hb?' · '+hbText(w.hb):'')+'</p>'
+    +'<button type="button" class="big-btn primary" id="wsHb" style="width:100%">'+(w.hb?'改红包':'🧧 包个红包')+'</button>'
+    +'<button type="button" class="big-btn danger" id="wsDel" style="width:100%;margin-top:8px">不想吃了</button>'
+    +'<button type="button" class="big-btn ghost" id="wsClose" style="width:100%;margin-top:8px">关上</button>');
+  $('wsHb').onclick=function(){ openHb(wid); };
+  $('wsDel').onclick=function(){ closeSheet(); act(api('/api/wishes/'+wid+'/remove',{method:'POST'}),'取消了'); };
+  $('wsClose').onclick=closeSheet;
+}
 
 // 买菜（全家）
 // 买菜默认按晚饭来：只看三天里定好的晚饭（早饭不算）
@@ -951,7 +1059,9 @@ function renderShop(){
   var simple = role==='mom';
   var planned={}; plannedGroups().forEach(function(g){ g.dishes.forEach(function(d){ if(!planned[d.id]) planned[d.id]=g.label; }); });
   var title=$('shopSecTitle');
-  if(simple){ title.hidden=!Object.keys(planned).length; title.innerHTML='定了要做的菜 <small>点开看每道菜的食材</small>'; $('dishChips').hidden=true; shopOpen=null; }
+  // 妈妈：只有清单、常买、一句话入口；定了的菜自己把食材加进来，不用她按菜去点
+  $('shopForm').hidden=simple; $('shopStatus').hidden=simple; renderShopRemind();
+  if(simple){ title.hidden=true; $('dishChips').hidden=true; shopOpen=null; }
   else { title.hidden=false; title.innerHTML='按菜加 <small>点一道菜，再点它的食材</small>'; $('dishChips').hidden=false; }
   var wished={}; (state.wishes||[]).forEach(function(w){ if(w.status!=='done') wished[w.dishId]=true; });
   var all=(state.dishes||[]).slice().sort(function(a,b){
@@ -966,7 +1076,7 @@ function renderShop(){
   else chips.innerHTML=all.map(function(d){ var on=openIds.indexOf(d.id)>=0; var tag=planned[d.id]?'<span class="tag">'+esc(planned[d.id])+'</span>':wished[d.id]?'<span class="tag" style="background:var(--good)">想吃</span>':''; return '<button type="button" data-id="'+d.id+'" class="'+(on?'on':'')+'">'+esc(d.emoji||'')+' '+esc(d.name)+tag+'</button>'; }).join('');
   Array.prototype.forEach.call(chips.querySelectorAll('button'), function(b){ b.onclick=function(){ var id=Number(b.getAttribute('data-id')); shopOpen = (shopOpen===id) ? -1 : id; renderShop(); }; });
   // 2) 展开的菜：食材可点
-  var box=$('planBox'); var openDishes=openIds.map(dishById).filter(Boolean);
+  var box=$('planBox'); var openDishes=simple?[]:openIds.map(dishById).filter(Boolean);
   box.hidden=!openDishes.length;
   box.innerHTML=openDishes.map(function(d){
     var ing=d.ingredients||[]; var missing=ing.filter(function(x){ return !inList(x); });
@@ -998,10 +1108,12 @@ function renderShop(){
   var fq=staples.filter(function(n){ return !inList(n)&&!need.some(function(y){ return y.x===n; }); });
   // 推荐买的：放在清单下面，可以折起来（记在这台手机上）
   var cnt=need.length+wishNeed.length+fq.length, fb=$('foldShopSug');
-  fb.hidden=!loaded;
+  fb.hidden=!loaded||simple;
+  if(simple){ need=[]; stapleEdit=false; }
   fb.innerHTML='<span class="arr">'+(shopSugFold?'▶':'▼')+'</span>推荐买的 <small>'+(cnt?cnt+' 样':'')+(shopSugFold?(cnt?'，':'')+'点开看':'')+'</small>';
   var sg='';
-  if(!shopSugFold){
+  if(simple){ if(fq.length) sg='<div class="sg"><span class="sgl">常买，点一下加</span><div class="chips">'+fq.map(function(n){ return '<button type="button" data-n="'+esc(n)+'">＋ '+esc(n)+'</button>'; }).join('')+'</div></div>'; }
+  else if(!shopSugFold){
     if(need.length) sg+='<div class="sg"><span class="sgl">做菜要用（这一周定好的晚饭，标着哪天）</span><div class="chips">'+need.map(function(y){ return '<button type="button" data-n="'+esc(y.x)+'" data-from="'+esc(y.from)+'">＋ '+esc(y.x)+'<small>'+esc(y.day)+' · '+esc(y.from)+'</small></button>'; }).join('')+'</div></div>';
     else if(!plannedGroups().length) sg+='<p class="note" style="text-align:left;margin:0 0 10px">这一周的晚饭还没定，定了以后缺的食材会列在这里，好提前买</p>';
     if(wishNeed.length) sg+='<div class="sg"><span class="sgl">想吃的菜（还没排日子，也可以先买）</span><div class="chips">'+wishNeed.map(function(y){ return '<button type="button" data-n="'+esc(y.x)+'" data-from="'+esc(y.from)+'">＋ '+esc(y.x)+'<small>'+esc(y.who)+'想吃 · '+esc(y.from)+'</small></button>'; }).join('')+'</div></div>';
@@ -1029,16 +1141,33 @@ function renderShop(){
   }
   var store=window.STORE&&window.STORE.search?window.STORE:null;
   function row(it){
-    var btn='<button type="button" class="shop-item'+(it.done?' done':'')+'" data-id="'+it.id+'"><span class="bx">'+(it.done?'✓':'')+'</span><span class="nm">'+esc(it.name)+(it.from?'<small>'+esc(it.from)+'</small>':'')+'</span></button>';
-    if(!store||it.done) return btn;
+    var btn='<button type="button" class="shop-item'+(it.done?' done':'')+'" data-id="'+it.id+'"><span class="bx">'+(it.done?'✓':'')+'</span><span class="nm">'+esc(it.name)+(it.note?' <small style="display:inline;color:var(--fg)">'+esc(it.note)+'</small>':'')+(it.from?'<small>'+esc(it.from)+'</small>':'')+'</span></button>';
+    if(it.done) return btn;
+    var nb='<button type="button" class="nobuy" data-rm="'+it.id+'">不用<br>买</button>';
+    if(!store) return '<div class="shop-row">'+btn+nb+'</div>';
     var href=store.search.replace('{q}', encodeURIComponent(it.name));
-    return '<div class="shop-row">'+btn+'<a class="store" href="'+esc(href)+'" target="_blank" rel="noopener">🛒 '+esc(store.name)+'</a></div>';
+    return '<div class="shop-row">'+btn+nb+'<a class="store" href="'+esc(href)+'" target="_blank" rel="noopener">'+esc(store.name)+'</a></div>';
   }
-  $('shopList').innerHTML=(open.length||done.length)?open.map(row).join('')+(done.length?'<h3 class="sec">买到了</h3>'+done.map(row).join(''):''):(loaded?'<p class="note">清单是空的。按 🎤 说一句要买什么就行'+(simple?'':'，或者在下面点一道菜加它的食材')+'</p>':'');
+  $('shopList').innerHTML=(open.length||done.length)?open.map(row).join('')+(done.length?'<h3 class="sec">买到了</h3>'+done.map(row).join(''):''):(loaded?'<p class="note">清单是空的。'+(simple?'定了做什么菜，要买的会自己加进来；也可以按上面的按钮说一句':'按 🎤 说一句要买什么就行，或者在下面点一道菜加它的食材')+'</p>':'');
   Array.prototype.forEach.call($('shopList').querySelectorAll('.shop-item'), function(b){ b.onclick=function(){ act(api('/api/shopping',{method:'POST',json:{op:'toggle',id:Number(b.getAttribute('data-id'))}})); }; });
+  Array.prototype.forEach.call($('shopList').querySelectorAll('.nobuy'), function(b){ b.onclick=function(){ act(api('/api/shopping',{method:'POST',json:{op:'remove',id:Number(b.getAttribute('data-rm'))}}),'拿掉了，不用买'); }; });
   $('btnClearDone').hidden=!(open.length||done.length);
-  $('btnClearDone').textContent = clearArmed ? '确定清空？再点一下' : '✅ 已下单，清空菜篮子';
+  $('btnClearDone').textContent = clearArmed ? '确定清空？再点一下' : '✅ 都下单了，清空菜篮子';
   $('btnClearDone').classList.toggle('danger', clearArmed);
+}
+// 菜篮子顶上的提醒：还没定怎么做的一类菜（「周三的鱼」）、排了但不知道要买什么的菜
+function renderShopRemind(){
+  var box=$('shopRemind'); if(!box) return; var out=[];
+  planDays().forEach(function(p){ if(p.done||!p.cook) return;
+    if(p.cook.pending) out.push({t:nightFull(p.date)+'的「'+p.cook.pending+'」还没定怎么做', b:'看看做法', q:p.cook.pending, date:p.date});
+    (p.cook.dishIds||[]).map(dishById).filter(function(d){ return d&&d.cat==='dinner'&&!(d.ingredients||[]).length; }).forEach(function(d){
+      out.push(d.name.length<=3 ? {t:nightFull(p.date)+'的「'+d.name+'」还不知道怎么做', b:'看看做法', q:d.name, date:p.date, rep:d.id} : {t:nightFull(p.date)+'的'+d.name+'还不知道要买什么', b:'想想要买什么', ing:d.id});
+    }); });
+  box.innerHTML=out.map(function(x,i){ return '<div class="remind"><span>'+esc(x.t)+'</span><button type="button" data-i="'+i+'">'+esc(x.b)+'</button></div>'; }).join('');
+  Array.prototype.forEach.call(box.querySelectorAll('button'), function(b){ b.onclick=function(){ var x=out[Number(b.getAttribute('data-i'))];
+    if(x.ing){ var d=dishById(x.ing); b.disabled=true; b.textContent='正在想…'; api('/api/ingredients',{method:'POST',json:{name:d.name}}).then(function(r){ return api('/api/dishes/'+d.id+'/update',{method:'POST',json:{ingredients:r.items||[]}}).then(function(){ return shopAdd((r.items||[]).filter(function(n){ return !inList(n); }), d.name); }); }).catch(function(e){ toast(e.message||'没想出来'); renderShop(); }); }
+    else openCategory(x.q, x.date, {replaceDishId:x.rep});
+  }; });
 }
 $('shopForm').onsubmit=function(e){ e.preventDefault(); var add=parseList($('shopInput').value); if(!add.length) return; shopAdd(add).then(function(){ $('shopInput').value=''; }); };
 $('btnShopVoice').onclick=function(){ voiceCapture({btn:$('btnShopVoice'),status:$('shopStatus'),input:$('shopInput'),onText:function(t){ var add=parseList(t); if(!add.length){ $('shopStatus').textContent='没听清，请再说一次'; return; } shopAdd(add); }}); };
@@ -1080,7 +1209,35 @@ function dishRow(d, i, n){
 var menuFold={dinner:load('bf_fold_dinner')==='1', breakfast:load('bf_fold_breakfast')==='1'};
 // 菜单里的顺序：有红包的排最前（红包多的在前），其余按拖好的顺序
 function menuOrder(list){ return list.map(function(d,i){ return {d:d,i:i,hb:hbTotal(d.id)}; }).sort(function(a,b){ return (b.hb-a.hb)||(a.i-b.i); }).map(function(x){ return x.d; }); }
+var recipeCat='dinner';
 function renderRecipes(){
+  var mom=role==='mom';
+  $('recipeMom').hidden=!mom; $('recipeKid').hidden=mom;
+  renderPickBar();
+  if(mom) renderRecipesMom(); else renderRecipesKid();
+}
+// 妈妈的菜谱：只有图和名字，点开一道菜看要买什么、做法、排哪天
+function renderRecipesMom(){
+  var counts={dinner:dishesOf('dinner').length, breakfast:dishesOf('breakfast').length};
+  $('recipeSeg').innerHTML=[['dinner','晚饭的菜'],['breakfast','早饭']].map(function(x){ return '<button type="button" data-c="'+x[0]+'" class="'+(recipeCat===x[0]?'on':'')+'">'+x[1]+' '+counts[x[0]]+'</button>'; }).join('');
+  Array.prototype.forEach.call($('recipeSeg').querySelectorAll('button'), function(b){ b.onclick=function(){ recipeCat=b.getAttribute('data-c'); renderRecipesMom(); }; });
+  var wg={}; wishGroups().forEach(function(x){ wg[x.d.id]=x; });
+  var plannedOn={}; planDays().forEach(function(p){ if(!p.done&&p.cook) (p.cook.dishIds||[]).forEach(function(id){ if(!plannedOn[id]) plannedOn[id]=p.date; }); });
+  var list=menuOrder(dishesOf(recipeCat)).slice().sort(function(a,b){ function rk(d){ return plannedOn[d.id]?0:wg[d.id]?1:2; } return rk(a)-rk(b); });
+  $('recipeGrid').innerHTML=list.length?list.map(function(d){
+    var tag=plannedOn[d.id]?'<span class="tg p">'+esc(nightLabel(plannedOn[d.id]))+'做</span>':wg[d.id]?'<span class="tg w">'+esc(wg[d.id].who.join('、'))+'想吃</span>':d.mom&&d.cat==='dinner'?'<span class="tg m">拿手菜</span>':d.lastMade?'<span class="tg m">上次 '+esc(d.lastMade.slice(5).replace('-','/'))+'</span>':'';
+    return '<button type="button" class="card" data-id="'+d.id+'">'+picHtml(d)+'<div class="name">'+esc(d.name)+'</div><div>'+tag+'</div></button>';
+  }).join(''):'<div class="empty">还没有菜。按上面的按钮说一句「加一道红烧肉」</div>';
+  Array.prototype.forEach.call($('recipeGrid').querySelectorAll('.card'), function(b){ b.onclick=function(){ openDishSheet(Number(b.getAttribute('data-id'))); }; });
+}
+// 从「这几天」来挑菜：顶上写着给哪一顿挑
+function renderPickBar(){
+  var bar=$('pickBar'); if(!pickFor||role==='mom'){ bar.hidden=true; return; }
+  bar.hidden=false;
+  bar.innerHTML='<span>'+(pickFor.cat==='breakfast'?'给'+(pickFor.date===today()?'今早':'明早')+'早饭挑：点「🥣 就吃这个」，可以选几样':'挑想吃的晚饭：点「😋 我想吃」，妈妈会看到')+'</span><button type="button" id="pickBack">← 回到这几天</button>';
+  $('pickBack').onclick=function(){ pickFor=null; showView('days'); render(); window.scrollTo(0,0); };
+}
+function renderRecipesKid(){
   var dn=menuOrder(dishesOf('dinner')), bf=menuOrder(dishesOf('breakfast'));
   [['foldDinner','dinner','正餐',dn,'listDinner'],['foldBreakfast','breakfast','早饭',bf,'listBreakfast']].forEach(function(x){
     $(x[0]).innerHTML='<span class="arr">'+(menuFold[x[1]]?'▶':'▼')+'</span>'+x[2]+' <small>'+x[3].length+' 道'+(menuFold[x[1]]?'，点开看':'')+'</small>';
@@ -1144,7 +1301,12 @@ function quickRow(d){
   var allIn=ing.length&&!miss.length;
   var buy='<button type="button" class="buy'+(allIn?' all':'')+'" data-act="wantbuy">'+(allIn?'✓ 都在菜篮子':'🛒 我要买'+(ing.length&&miss.length<ing.length?' '+miss.length+' 样':''))+'</button>';
   var tags=d.cat==='dinner'?plannedTags(d.id):'';
-  return '<div class="quick">'+(d.cat==='dinner'?'<button type="button" data-act="want">🍳 我想做</button>':'')+buy+'</div>'+(tags?'<div class="ptags">'+tags+'</div>':'');
+  var main='';
+  if(MEMBERS.indexOf(role)>=0){
+    if(d.cat==='dinner'){ var w=openWishesOf(role).filter(function(x){ return x.dishId===d.id; })[0]; main='<button type="button" class="'+(w?'on':'')+'" data-act="eat">'+(w?'✓ 我点了':'😋 我想吃')+'</button>'; }
+    else { var on=pickedIds(pickIsCurrent()?state.pick:null).indexOf(d.id)>=0; main='<button type="button" class="'+(on?'on':'')+'" data-act="bf">'+(on?'✓ '+(targetDate()===today()?'今早':'明早')+'吃这个':'🥣 就吃这个')+'</button>'; }
+  } else if(d.cat==='dinner') main='<button type="button" data-act="want">🍳 哪天做</button>';
+  return '<div class="quick">'+main+buy+'</div>'+(tags?'<div class="ptags">'+tags+'</div>':'');
 }
 // 「我要买」：缺的食材一下加进菜篮子；没填食材的，有 AI 就先让 AI 填再加，没有就展开让人说一句；都在了就去菜篮子
 var buyBusy=false;
@@ -1167,43 +1329,12 @@ function wantBuy(d){
 }
 // 这道菜已经排在哪几天（没做的）
 function plannedTags(id){ return planDays().filter(function(p){ return !p.done&&p.cook&&(p.cook.dishIds||[]).indexOf(id)>=0; }).map(function(p){ return '<span class="ptag">📅 '+esc(nightLabel(p.date))+'</span>'; }).join(''); }
-// 「我想做」：弹出最近一周，点一天就把这道菜加进那天的晚饭（原来定的菜留着）
-function dayNote(p, id){
-  if(p.done) return '已经做好了';
-  if(p.cook&&(p.cook.dishIds||[]).indexOf(id)>=0) return '已经排在这天了';
-  var c=cookNames(p);
-  if(c&&c!==NO_COOK) return '已定：'+c+'，再加这道';
-  if(c===NO_COOK) return '原来说不做饭，改成做这道';
-  return isUnsure(p)?'妈妈还没想好':'还没定';
-}
 var NO_COOK='不做饭，各自解决';
-function openWant(d){
-  var days=planDays();
-  openSheet('<h3>🍳 哪天晚上做「'+esc(d.name)+'」？</h3><p class="hint" style="text-align:left;margin:0 0 10px">'+(role==='mom'?'点一天就排上，原来定的菜还在，小饭桌上能看到':'点一天就排上，妈妈会收到通知，她也可以再改')+'</p>'
-    +'<div class="daypick">'+days.map(function(p,i){ var dis=p.done||(p.cook&&(p.cook.dishIds||[]).indexOf(d.id)>=0); return '<button type="button" data-date="'+p.date+'" data-i="'+i+'"'+(dis?' disabled':'')+'><b>'+esc(nightFull(p.date))+'</b><small>'+esc(dayNote(p,d.id))+'</small></button>'; }).join('')+'</div>'
-    +'<button type="button" class="big-btn ghost" id="wantCancel" style="width:100%;margin-top:6px">算了</button>');
-  $('wantCancel').onclick=closeSheet;
-  Array.prototype.forEach.call($('sheetBody').querySelectorAll('.daypick button'), function(b){ b.onclick=function(){
-    var date=b.getAttribute('data-date'), i=Number(b.getAttribute('data-i'));
-    Array.prototype.forEach.call($('sheetBody').querySelectorAll('.daypick button'), function(x){ x.disabled=true; });
-    api('/api/dinner/add',{method:'POST',json:{who:role,date:date,dishId:d.id}}).then(function(){ return loadState(); }).then(function(){
-      var p=planByDate(date), all=cookNames(p);
-      openSheet('<h3>✓ 排好了</h3><div class="bigdone">'+esc(nightFull(date))+'<br>做 '+esc(all||d.name)+'</div>'
-        +'<p class="note" style="text-align:left">'+(role==='mom'?'女儿和小陈会收到通知':'已经告诉妈妈了，也放进了你的心愿单，想包红包可以去那里包')+'</p>'
-        +'<button type="button" class="big-btn primary" id="wantGo" style="width:100%">去'+(role==='mom'?'小饭桌':'点个菜')+'看看</button>'
-        +'<button type="button" class="big-btn ghost" id="wantStay" style="width:100%;margin-top:8px">接着看菜谱</button>');
-      $('wantStay').onclick=closeSheet;
-      $('wantGo').onclick=function(){
-        closeSheet(); if(i>=SHOW_DAYS) moreDays=true;
-        showView(role==='mom'?'today':'order'); render();
-        setTimeout(function(){ var el=$(role==='mom'?'cookCard':'momSaid'); if(el){ var nav=$('nav'), off=(nav?nav.getBoundingClientRect().height:0)+12; window.scrollTo({top:Math.max(0, el.getBoundingClientRect().top+window.pageYOffset-off), behavior:'smooth'}); } },60);
-      };
-    }).catch(function(e){ closeSheet(); toast(e.message||'没排上，请再试一次'); });
-  }; });
-}
 function recipeAction(a, d, el, li){
   var ing=(d.ingredients||[]).slice();
-  if(a==='want'){ openWant(d); return; }
+  if(a==='want'){ openDishSheet(d.id); return; }
+  if(a==='eat'){ var w=openWishesOf(role).filter(function(x){ return x.dishId===d.id; })[0]; if(w) openWishSheet(w.id); else orderWish({who:role,dishId:d.id}, d.name); return; }
+  if(a==='bf'){ var ids=pickedIds(pickIsCurrent()?state.pick:null), k=ids.indexOf(d.id); if(k>=0) ids.splice(k,1); else ids.push(d.id); act(api('/api/pick',{method:'POST',json:{type:'dishes',ids:ids,date:targetDate(),who:role}})).then(function(r){ if(r) toast(r.pick?'选好了：'+r.pick.resolvedName:'取消了'); }); return; }
   if(a==='wantbuy'){ wantBuy(d); return; }
   if(a==='toggle'){ expandedId=expandedId===d.id?null:d.id; pendingDelete=null; renderRecipes(); return; }
   if(a==='rming'){ var x=el.getAttribute('data-x'); saveIngredients(d, ing.filter(function(y){ return y!==x; })); return; }
@@ -1241,23 +1372,295 @@ $('addForm').onsubmit=function(e){ e.preventDefault(); addDish($('newDishName').
 $('btnDishVoice').onclick=function(){ voiceCapture({btn:$('btnDishVoice'),status:$('recipeStatus'),input:$('newDishName'),onText:function(t){ $('newDishName').value=cleanName(t); addDish(t); }}); };
 Array.prototype.forEach.call($('newCat').querySelectorAll('button'), function(b){ b.onclick=function(){ newCat=b.getAttribute('data-cat'); Array.prototype.forEach.call($('newCat').querySelectorAll('button'), function(x){ x.classList.toggle('on', x===b); }); }; });
 
-// ---- 身份与页签 ----
-function defaultView(){
-  var h=new Date().getHours();
-  if(role==='mom') return 'today';
-  if(role==='kid') return h>=15 ? 'breakfast' : 'order';
-  return 'order';
+// ===================== 妈妈：一句话入口 =====================
+// 妈妈习惯一句话把哪天、做什么、买什么、什么做不了都说了。App 拆开，写在屏幕上并读给她听，她说「对」或点「对，就这样」才记。
+function post(path, json){ return api(path,{method:'POST',json:json||{}}); }
+function renderVoiceBoxes(){
+  Array.prototype.forEach.call(document.querySelectorAll('.vbox'), function(box){
+    if(role!=='mom'){ box.hidden=true; return; }
+    box.hidden=false;
+    if(box.getAttribute('data-built')) return;
+    box.setAttribute('data-built','1');
+    box.innerHTML='<button type="button" class="vbig"><b>🎤 按一下，说一句</b><small>'+esc(box.getAttribute('data-hint')||'')+'</small></button>'
+      +'<div class="vtype"><button type="button" class="vlink">⌨️ 不方便说话？打字</button></div>'
+      +'<form class="add-row vform" hidden><input placeholder="比如：星期三做鱼，买点葱姜" autocomplete="off"><button type="submit" class="big-btn">好</button></form>'
+      +'<p class="note vstatus" style="text-align:left;margin:4px 0 8px"></p>';
+    var btn=box.querySelector('.vbig'), form=box.querySelector('.vform'), input=form.querySelector('input'), st=box.querySelector('.vstatus');
+    btn.onclick=function(){ if(!(state.voice&&canRecord)&&!(SR&&!inWeChat)) form.hidden=false; voiceCapture({btn:btn,status:st,input:input,onText:function(t){ st.textContent=''; runIntent(t); }}); };
+    box.querySelector('.vlink').onclick=function(){ form.hidden=!form.hidden; if(!form.hidden) input.focus(); };
+    form.onsubmit=function(e){ e.preventDefault(); var t=input.value.trim(); if(!t) return; input.value=''; input.blur(); runIntent(t); };
+  });
 }
+var intent=null;
+function itemsText(a){ return (a.items||[]).map(function(x){ return x.name+(x.note?'（'+x.note+'）':''); }).join('、'); }
+function actLine(a){
+  switch(a.type){
+    case 'plan': return {b:nightFull(a.date)+'晚饭：'+a.dish, s:a.generic?'「'+a.dish+'」是一类菜，记好以后给你看有哪些做法':a.isNew?'菜谱里没有，新加一道，要买的 AI 来想':'要买的会自己进菜篮子', say:nightFull(a.date)+'做'+a.dish};
+    case 'unplan': return {b:nightFull(a.date)+'不做 '+a.dish};
+    case 'nocook': return {b:nightFull(a.date)+'不做饭'};
+    case 'buy': return {b:'菜篮子加：'+itemsText(a)};
+    case 'have': return {b:'菜篮子拿掉：'+itemsText(a), s:'家里有，不用买'};
+    case 'bought': return {b:'买到了：'+itemsText(a), s:'菜篮子里打钩'};
+    case 'ordered': return {b:'都下单了，清空菜篮子'};
+    case 'decline': return {b:'告诉'+(a.names||[]).join('和')+'：'+a.dish+'这次做不了', s:a.reason?'原因：'+a.reason:''};
+    case 'made': return {b:'今晚的饭做好了，告诉大家'};
+    case 'add_dish': return {b:'菜谱里加一道：'+a.name, s:a.isNew?(a.cat==='breakfast'?'早饭':''):'菜谱里已经有了'};
+    case 'unclear': return {b:'这句没听懂：「'+a.text+'」', s:'没记。想说的话再说一次'};
+  }
+  return {b:''};
+}
+function runIntent(text, prev){
+  stopSpeak();
+  openSheet('<h3>🎤 '+(prev?'改一下':'我听到了')+'</h3><div class="heard">'+esc(prev?prev+' → '+text:text)+'</div><p class="note">正在想怎么记…</p>');
+  post('/api/intent',{text:text, prev:prev||'', today:today(), dates:planDays().map(function(p){ return p.date; })})
+    .then(function(r){ showIntent(prev?prev+'；'+text:text, r.actions||[]); })
+    .catch(function(e){ openSheet('<h3>没弄明白</h3><p class="hint" style="text-align:left">'+esc(e.message||'出错了')+'</p><button type="button" class="big-btn primary" id="iClose" style="width:100%">好，再说一次</button>'); $('iClose').onclick=closeSheet; });
+}
+function askAnswer(w){
+  var days=planDays(), p=days[0];
+  if(w==='home'){ var hc=homeCount(p), wg=wishGroups().filter(function(x){ return !x.planned; }); return nightLabel(p.date)+'回来吃 '+hc.n+' 个人'+(hc.who.length?'：'+hc.who.join('、'):'')+'。'+(wg.length?'他们想吃：'+wg.map(function(x){ return x.d.name; }).join('、')+'。':''); }
+  if(w==='breakfast') return speakText+'。';
+  if(w==='shopping'){ var l=(state.shopping||[]).filter(function(x){ return !x.done; }).map(function(x){ return x.name; }); return l.length?'还要买 '+l.length+' 样：'+l.join('、')+'。':'菜篮子是空的，没有要买的。'; }
+  return days.map(function(x){ return nightFull(x.date)+'：'+(cookNamesFull(x)||'还没定'); }).join('。')+'。';
+}
+function showIntent(text, acts){
+  var asks=acts.filter(function(a){ return a.type==='ask'; }), ideas=acts.filter(function(a){ return a.type==='ideas'; });
+  var rest=acts.filter(function(a){ return a.type!=='ask'&&a.type!=='ideas'; });
+  var doable=rest.filter(function(a){ return a.type!=='unclear'; });
+  if(!doable.length){
+    if(ideas.length){ if(ideas[0].query) openCategory(ideas[0].query, null); else openIdeas('dinner'); return; }
+    if(asks.length){ var ans=asks.map(function(a){ return askAnswer(a.what); }).join(''); openSheet('<h3>🔊 '+esc(text)+'</h3><p style="font-size:24px;line-height:1.5;margin:0 0 14px">'+esc(ans)+'</p><button type="button" class="big-btn primary" id="iClose" style="width:100%">好</button>'); $('iClose').onclick=function(){ stopSpeak(); closeSheet(); }; speak(ans); return; }
+    openSheet('<h3>没听懂</h3><div class="heard">你说：「'+esc(text)+'」</div><p class="hint" style="text-align:left">可以这样说：「星期三做鱼」「买点葱姜」「鸡蛋买到了」「丝瓜汤做不了」「今晚几个人回来吃」</p><button type="button" class="big-btn primary" id="iClose" style="width:100%">好，再说一次</button>'); $('iClose').onclick=closeSheet; speak('没听懂，再说一次吧'); return;
+  }
+  intent={text:text, rows:rest.map(function(a){ return {a:a, on:true}; }), extra:asks.map(function(a){ return askAnswer(a.what); }).join('')};
+  drawIntent(true);
+}
+function drawIntent(say){
+  var lines=[];
+  var html='<h3>我听懂的</h3><div class="heard">你说：「'+esc(intent.text)+'」</div>'+intent.rows.map(function(r,i){ var L=actLine(r.a); if(r.on&&r.a.type!=='unclear') lines.push(L.say||L.b);
+      return '<div class="act'+(r.on?'':' off')+(r.a.type==='unclear'?' unclear':'')+'"><div class="x"><b>'+esc(L.b)+'</b>'+(L.s?'<small>'+esc(L.s)+'</small>':'')+'</div>'+(r.a.type==='unclear'?'':'<button type="button" class="no" data-i="'+i+'">'+(r.on?'不对':'恢复')+'</button>')+'</div>'; }).join('')
+    +(intent.extra?'<p style="font-size:20px">'+esc(intent.extra)+'</p>':'')
+    +'<p class="note" id="iNote"></p>'
+    +'<button type="button" class="big-btn primary" id="iOk" style="width:100%">对，就这样</button>'
+    +'<button type="button" class="big-btn ghost" id="iVoice" data-label="🎤 说「对」，或者说哪里不对" style="width:100%;margin-top:8px">🎤 说「对」，或者说哪里不对</button>'
+    +'<button type="button" class="big-btn ghost" id="iCancel" style="width:100%;margin-top:8px">都不对，算了</button>';
+  openSheet(html);
+  Array.prototype.forEach.call($('sheetBody').querySelectorAll('.act .no'), function(b){ b.onclick=function(){ var r=intent.rows[Number(b.getAttribute('data-i'))]; r.on=!r.on; drawIntent(false); }; });
+  $('iOk').onclick=execIntent;
+  $('iCancel').onclick=function(){ stopSpeak(); closeSheet(); toast('好，没记'); };
+  $('iVoice').onclick=function(){ voiceCapture({btn:$('iVoice'),status:$('iNote'),input:null,onText:function(t){ var x=t.trim().replace(/[。！!，,.\s]+$/,''); if(/^(对|对的|对了|对对|好|好的|是|是的|行|可以|没错|嗯|嗯嗯|就这样|对就这样)$/.test(x)) execIntent(); else runIntent(t, intent.text); }}); };
+  if(say&&lines.length) speak('我听到的是：'+lines.join('；')+'。'+(intent.extra||'')+'对的话就说对，或者点「对，就这样」');
+}
+function execIntent(){
+  stopSpeak();
+  var acts=intent.rows.filter(function(r){ return r.on&&r.a.type!=='unclear'; }).map(function(r){ return r.a; });
+  if(!acts.length){ closeSheet(); return; }
+  openSheet('<h3>正在记…</h3>');
+  var undo={cooks:{}, shopIds:[], dishIds:[]}, done=[], generic=[], madeDate=null, shopAdded=[];
+  function remember(date){ if(undo.cooks.hasOwnProperty(date)) return; var p=planByDate(date); undo.cooks[date]=p&&p.cook?{dishIds:(p.cook.dishIds||[]).slice(), text:p.cook.text||'', pending:p.cook.pending||''}:null; }
+  function doAct(a){
+    if(a.type==='plan'){ remember(a.date);
+      if(a.generic){ generic.push(a); return post('/api/dinner/add',{who:'mom',date:a.date,pending:a.dish}); }
+      var pid=a.dishId?Promise.resolve(a.dishId):post('/api/dishes',{name:a.dish,cat:'dinner',mom:true,by:'mom'}).then(function(r){ if(r.dish&&!r.existed) undo.dishIds.push(r.dish.id); return r.dish.id; });
+      return pid.then(function(id){ return post('/api/dinner/add',{who:'mom',date:a.date,dishId:id}); }).then(function(r){ shopAdded=shopAdded.concat(r.shopAdded||[]); });
+    }
+    if(a.type==='unplan'){ remember(a.date); var pl=planByDate(a.date); if(!pl||!pl.cook) return;
+      return post('/api/dinner/cook',{date:a.date, dishIds:(pl.cook.dishIds||[]).filter(function(x){ return x!==a.dishId; }), text:pl.cook.text&&pl.cook.text!==UNSURE?pl.cook.text:'', pending:pl.cook.pending&&pl.cook.pending!==a.dish?pl.cook.pending:''}); }
+    if(a.type==='nocook'){ remember(a.date); return post('/api/dinner/cook',{date:a.date,dishIds:[],text:NO_COOK}); }
+    if(a.type==='buy'){ var notes={}; a.items.forEach(function(x){ if(x.note) notes[x.name]=x.note; }); return post('/api/shopping',{op:'add',names:a.items.map(function(x){ return x.name; }),notes:notes,from:'妈妈说的'}).then(function(r){ undo.shopIds=undo.shopIds.concat(r.added||[]); }); }
+    if(a.type==='have'||a.type==='bought') return post('/api/shopping',{op:a.type==='have'?'drop':'check',names:a.items.map(function(x){ return x.name; })});
+    if(a.type==='ordered') return post('/api/shopping',{op:'ordered'});
+    if(a.type==='decline') return Promise.all((a.wishIds||[]).map(function(id){ return post('/api/wishes/'+id+'/decline',{reason:a.reason||''}); }));
+    if(a.type==='made'){ var d0=planDays()[0]; if(d0&&d0.cook&&(d0.cook.dishIds||[]).length&&!d0.done) madeDate=d0.date; return; }
+    if(a.type==='add_dish'){ if(!a.isNew) return; return post('/api/dishes',{name:a.name,cat:a.cat,mom:true,by:'mom'}).then(function(r){ if(r.dish&&!r.existed) undo.dishIds.push(r.dish.id); }); }
+  }
+  var chain=Promise.resolve();
+  acts.forEach(function(a){ chain=chain.then(function(){ return doAct(a); }).then(function(){ done.push(a); }); });
+  chain.then(function(){ return loadState(); }).then(function(){
+    if(madeDate){ markDone(madeDate); return; }
+    var summary='✓ 记好了：<br>'+done.filter(function(a){ return !(a.type==='plan'&&a.generic); }).map(function(a){ return esc(actLine(a).b); }).join('<br>')+(shopAdded.length?'<br>菜篮子自己加了：'+esc(shopAdded.join('、')):'');
+    if(generic.length){ speak('记好了。'+generic[0].dish+'是一类菜，给你看看有哪些做法'); openCategory(generic[0].dish, generic[0].date, {banner:done.length>generic.length?summary:''}); return; }
+    speak('记好了。'+(shopAdded.length?'要买的东西已经放进菜篮子了':''));
+    showDone(summary, undo, done);
+  }).catch(function(e){ loadState(); showDone('有一部分没记上：'+esc(e.message||'出错了')+(done.length?'<br>已经记好的：'+done.map(function(a){ return esc(actLine(a).b); }).join('、'):''), undo, done); });
+}
+function showDone(html, undo, done){
+  var canUndo=Object.keys(undo.cooks).length||undo.shopIds.length||undo.dishIds.length;
+  var noUndo=done.filter(function(a){ return a.type==='decline'||a.type==='ordered'||a.type==='bought'||a.type==='have'; }).length;
+  openSheet('<div class="okbanner">'+html+'</div>'+(canUndo&&noUndo?'<p class="note" style="text-align:left">「做不了」「买到了」「家里有」「下单」这几样撤销不了</p>':'')
+    +'<button type="button" class="big-btn primary" id="dOk" style="width:100%">好</button>'+(canUndo?'<button type="button" class="big-btn ghost" id="dUndo" style="width:100%;margin-top:8px">记错了，撤销</button>':''));
+  $('dOk').onclick=function(){ stopSpeak(); closeSheet(); };
+  if($('dUndo')) $('dUndo').onclick=function(){
+    $('dUndo').disabled=true; var ps=[];
+    Object.keys(undo.cooks).forEach(function(date){ var c=undo.cooks[date]; ps.push(post('/api/dinner/cook',{date:date,dishIds:c?c.dishIds:[],text:c?c.text:'',pending:c?c.pending:''}).catch(function(){})); });
+    undo.shopIds.forEach(function(id){ ps.push(post('/api/shopping',{op:'remove',id:id}).catch(function(){})); });
+    Promise.all(ps).then(function(){ return Promise.all(undo.dishIds.map(function(id){ return api('/api/dishes/'+id,{method:'DELETE'}).catch(function(){}); })); }).then(loadState).then(function(){ closeSheet(); toast('撤销了'); });
+  };
+}
+// 从一句话里认日子：周三、星期三、今晚、明天、后天
+function dayFromText(t){
+  var ds=planDays().map(function(p){ return p.date; });
+  var m=String(t).match(/(?:星期|礼拜|周)([一二三四五六日天])/);
+  if(m){ var k='日一二三四五六天'.indexOf(m[1])%7; return ds.filter(function(d){ var q=d.split('-').map(Number); return new Date(q[0],q[1]-1,q[2]).getDay()===k; })[0]||null; }
+  if(/今天|今晚/.test(t)) return ds[0];
+  if(/明天|明晚/.test(t)) return ds.indexOf(addDays(today(),1))>=0?addDays(today(),1):null;
+  if(/后天/.test(t)) return ds.indexOf(addDays(today(),2))>=0?addDays(today(),2):null;
+  return null;
+}
+
+// ===================== 一类菜（「周三做鱼」）：给她看做法 =====================
+// 说一类菜，说明她还没想好怎么做：先列家里菜谱里有的，再让 AI 想几个新做法；点新做法 → 菜谱（要买的、做法），进菜谱、进菜篮子 → 问加不加进这周 → 选哪天
+var catState=null;
+function openCategory(query, date, opts){
+  opts=opts||{};
+  var wg={}; wishGroups().forEach(function(x){ wg[x.d.id]=x; });
+  var ex=dishesOf('dinner').filter(function(d){ return d.name!==query && (d.name.indexOf(query)>=0 || (d.ingredients||[]).some(function(x){ return x.indexOf(query)>=0; })); })
+    .sort(function(a,b){ return ((wg[b.id]?1:0)-(wg[a.id]?1:0)) || ((a.lastMade||'')<(b.lastMade||'')?-1:(a.lastMade||'')>(b.lastMade||'')?1:0); }).slice(0,4);
+  catState={query:query, date:date||null, opts:opts, existing:ex, ideas:[], loading:!!state.ai, said:false};
+  drawCategory(); if(state.ai) fetchCatIdeas(false);
+}
+function optHtml(key, name, small, isNew, emoji){ return '<button type="button" class="opt" data-k="'+key+'"><span class="e">'+esc(isNew?'✨':(emoji||'🍽️'))+'</span><span class="x"><b>'+esc(name)+(isNew?'<span class="newtag">新</span>':'')+'</b><small>'+esc(small||'')+'</small></span><span class="go">›</span></button>'; }
+function drawCategory(){
+  var c=catState, wg={}; wishGroups().forEach(function(x){ wg[x.d.id]=x; });
+  var html=(c.opts.banner?'<div class="okbanner">'+c.opts.banner+'</div>':'')
+    +'<h3>'+esc(c.date?nightFull(c.date)+'做'+c.query:c.query+'有哪些做法')+'</h3><p class="hint" style="text-align:left;margin:0 0 6px">点一个看看，也可以说「清蒸的」</p>'
+    +(c.existing.length?'<div class="grp">家里菜谱里有的</div>'+c.existing.map(function(d){ return optHtml('e'+d.id, d.name, wg[d.id]?wg[d.id].who.join('、')+'想吃':d.lastMade?'上次做 '+d.lastMade.slice(5).replace('-','/'):'还没做过', false, d.emoji); }).join(''):'')
+    +'<div class="grp">新做法'+(state.ai?'（AI 想的）':'')+'</div>'+(c.loading?'<p class="note" style="text-align:left">正在想…</p>':c.err?'<p class="note" style="text-align:left">'+esc(c.err)+'</p>':c.ideas.map(function(x,i){ return optHtml('n'+i, x.name, x.ingredients.length?'要买：'+x.ingredients.slice(0,4).join('、'):'', true); }).join(''))
+    +'<div class="btns3">'+(state.ai?'<button type="button" class="g" id="catMore">再想几个</button>':'')+'<button type="button" class="g" id="catLater">'+(c.date?'先这样，回头再定':'关上')+'</button></div>'
+    +'<button type="button" class="big-btn ghost" id="catVoice" data-label="🎤 说一句，比如「清蒸的」" style="width:100%;margin-top:8px">🎤 说一句，比如「清蒸的」</button><p class="note" id="catNote"></p>';
+  openSheet(html);
+  Array.prototype.forEach.call($('sheetBody').querySelectorAll('.opt'), function(b){ b.onclick=function(){ pickCatOption(b.getAttribute('data-k')); }; });
+  if($('catMore')) $('catMore').onclick=function(){ fetchCatIdeas(true); };
+  $('catLater').onclick=function(){ stopSpeak(); closeSheet(); if(c.date) toast('先记成「'+c.query+'」，想好了再定；菜篮子里会提醒', 5000); };
+  $('catVoice').onclick=function(){ voiceCapture({btn:$('catVoice'),status:$('catNote'),input:null,onText:function(t){
+    var x=t.replace(/[。！!，,.\s]|的|吧|做|就|那个|要/g,''); var all=c.existing.map(function(d){ return {k:'e'+d.id,n:d.name}; }).concat(c.ideas.map(function(d,i){ return {k:'n'+i,n:d.name}; }));
+    var hit=all.filter(function(o){ return x&&(o.n.indexOf(x)>=0||x.indexOf(o.n)>=0||(x.length>=2&&o.n.indexOf(x.slice(0,2))>=0)); })[0];
+    if(hit) pickCatOption(hit.k); else createIdea({name:cleanName(t)||t.trim()}, {date:c.date, replaceDishId:c.opts.replaceDishId});
+  }}); };
+  if(!c.said&&!c.loading){ c.said=true; var ns=c.existing.map(function(d){ return d.name; }); speak((ns.length?'家里有'+ns.join('、')+'。':'')+(c.ideas.length?'还有几个新做法：'+c.ideas.map(function(x){ return x.name; }).join('、')+'。':'')+'点一个看看'); }
+}
+function fetchCatIdeas(more){
+  var c=catState; c.loading=!more; if(more&&$('catMore')){ $('catMore').disabled=true; $('catMore').textContent='正在想…'; } else drawCategory();
+  post('/api/ideas',{query:c.query, cat:'dinner', n:3, exclude:c.ideas.map(function(x){ return x.name; })}).then(function(r){
+    if(catState!==c) return; c.loading=false; c.err=''; c.ideas=more?c.ideas.concat(r.items||[]):(r.items||[]); if(!c.ideas.length) c.err='AI 没想出来，再点「再想几个」'; drawCategory();
+  }).catch(function(e){ if(catState!==c) return; c.loading=false; c.err=e.message||'AI 出错了'; drawCategory(); });
+}
+function pickCatOption(k){
+  var c=catState; stopSpeak();
+  if(k.charAt(0)==='e') openDishSheet(Number(k.slice(1)), {date:c.date, flow:true, replaceDishId:c.opts.replaceDishId});
+  else { var x=c.ideas[Number(k.slice(1))]; if(x) createIdea(x, {date:c.date, replaceDishId:c.opts.replaceDishId}); }
+}
+// 新菜：进菜谱（带做法），妈妈那边要买的马上进菜篮子，再打开这道菜问加不加进这周
+function createIdea(x, o){
+  o=o||{}; openSheet('<h3>正在加进菜谱…</h3>');
+  var cat=x.cat||(o.cat)||'dinner';
+  return post('/api/dishes',{name:x.name, cat:cat, ingredients:x.ingredients||[], steps:x.steps||[], mom:role==='mom', by:role}).then(function(r){
+    var d=r.dish, need=(d.ingredients||[]).filter(function(n){ return !inList(n); });
+    var sp=(role==='mom'&&cat==='dinner'&&need.length)?post('/api/shopping',{op:'add',names:need,from:'新菜 · '+d.name}):Promise.resolve({added:[]});
+    return sp.then(function(sr){ return loadState().then(function(){ openDishSheet(d.id, {date:o.date, flow:role==='mom'&&cat==='dinner', justCreated:!r.existed, addedIds:sr.added||[], addedNames:(sr.added||[]).length?need:[], replaceDishId:o.replaceDishId}); }); });
+  }).catch(function(e){ closeSheet(); toast(e.message||'没加上，请再试一次'); });
+}
+
+// ===================== 一道菜：要买的、做法、哪天做 =====================
+var sheetOnClose=null;
+function openDishSheet(id, o){
+  o=o||{}; var d=dishById(id); if(!d){ closeSheet(); return; }
+  var wg=wishGroups().filter(function(x){ return x.d.id===id; })[0], meta=[];
+  if(wg) meta.push(wg.who.join('、')+'想吃'+(wg.days?'，等了 '+wg.days+' 天':''));
+  if(d.cat==='dinner') meta.push(d.lastMade?'上次做 '+d.lastMade.slice(5).replace('-','/')+(d.times?'，做过 '+d.times+' 次':''):'还没做过');
+  var planned=planDays().filter(function(p){ return !p.done&&p.cook&&(p.cook.dishIds||[]).indexOf(id)>=0; }).map(function(p){ return nightLabel(p.date); });
+  if(planned.length) meta.push('已排在'+planned.join('、'));
+  var ing=d.ingredients||[], steps=d.steps||[];
+  var html='<div class="dsheet"><div class="dpic">'+esc(d.emoji||'🍽️')+(d.image?'<img src="'+esc(d.image)+'" alt="" onerror="this.remove()">':'')+'</div><h2>'+esc(d.name)+'</h2><div class="m">'+esc(meta.join(' · '))+'</div>'
+    +(o.justCreated?'<div class="okbanner">✓ 已加进菜谱'+(o.addedNames&&o.addedNames.length?'<br>✓ 要买的 '+o.addedNames.length+' 样已进菜篮子':'')+'</div>':'')
+    +'<div class="sec2">要买的</div>'+(ing.length?'<div class="ingl">'+ing.map(function(x){ return '<span>'+esc(x)+(inList(x)?' ✓':'')+'</span>'; }).join('')+'</div>':'<p class="note" style="text-align:left;margin:0">还不知道要买什么'+(d.cat==='dinner'?'，排上日子以后 AI 会想好放进菜篮子':'')+'</p>')
+    +(steps.length?'<div class="sec2">怎么做 <button type="button" id="dsRead">🔊 读给我听</button></div><ol>'+steps.map(function(x){ return '<li>'+esc(x)+'</li>'; }).join('')+'</ol>':'')
+    +'<div id="dsAct"></div>'
+    +(role==='mom'?'<button type="button" class="secfold sm" id="dsMore"><span class="arr">▶</span>更多：换照片、拿手菜、删除</button><div id="dsMoreBox" hidden></div>':'')
+    +'<button type="button" class="big-btn ghost" id="dsClose" style="width:100%;margin-top:12px">关上</button></div>';
+  openSheet(html);
+  // 新做法加进菜篮子了，但她关掉没排日子：要买的拿掉（排上日子时会再自己加）
+  if(o.flow&&(o.addedIds||[]).length&&!o.scheduled) sheetOnClose=function(){ dropAdded(o); };
+  if($('dsRead')) $('dsRead').onclick=function(){ speak(d.name+'的做法。'+steps.map(function(x,i){ return '第'+(i+1)+'步，'+x; }).join('。')); };
+  $('dsClose').onclick=function(){ stopSpeak(); closeSheet(); };
+  if($('dsMore')) $('dsMore').onclick=function(){ var b=$('dsMoreBox'); b.hidden=!b.hidden; drawDishMore(d); };
+  drawDishAct(d, o);
+}
+function dropAdded(o){ var ids=o.addedIds||[]; o.addedIds=[]; if(!ids.length) return; Promise.all(ids.map(function(id){ return post('/api/shopping',{op:'remove',id:id}).catch(function(){}); })).then(loadState); }
+function drawDishAct(d, o){
+  var box=$('dsAct'); if(!box) return;
+  if(role!=='mom'){
+    if(d.cat==='dinner'){ var w=openWishesOf(role).filter(function(x){ return x.dishId===d.id; })[0];
+      box.innerHTML='<button type="button" class="big-btn primary" id="dsEat" style="width:100%;margin-top:12px">'+(w?'✓ 我点了（红包、不想吃了）':'😋 我想吃')+'</button>';
+      $('dsEat').onclick=function(){ if(w) openWishSheet(w.id); else { closeSheet(); orderWish({who:role,dishId:d.id}, d.name); } };
+    } else { var on=pickedIds(pickIsCurrent()?state.pick:null).indexOf(d.id)>=0;
+      box.innerHTML='<button type="button" class="big-btn primary" id="dsBf" style="width:100%;margin-top:12px">'+(on?'✓ '+(targetDate()===today()?'今早':'明早')+'吃这个（点一下取消）':'🥣 就吃这个')+'</button>';
+      $('dsBf').onclick=function(){ var ids=pickedIds(pickIsCurrent()?state.pick:null), k=ids.indexOf(d.id); if(k>=0) ids.splice(k,1); else ids.push(d.id); closeSheet(); act(api('/api/pick',{method:'POST',json:{type:'dishes',ids:ids,date:targetDate(),who:role}})).then(function(r){ if(r) toast(r.pick?'选好了：'+r.pick.resolvedName:'取消了'); }); };
+    }
+    return;
+  }
+  if(d.cat!=='dinner'){ box.innerHTML='<p class="note" style="text-align:left">早饭由女儿、小陈选</p>'; return; }
+  if(o.flow&&!o.asked){
+    box.innerHTML='<div class="askbox"><b>加进这周的晚饭吗？</b><div class="btns3"><button type="button" id="dsYes">加</button><button type="button" class="g" id="dsNo">先不加</button></div></div>';
+    $('dsYes').onclick=function(){ o.asked=true; o.sel=o.sel||o.date||null; drawDishAct(d,o); speak('哪天晚上做'+d.name+'？'+(o.sel?nightLabel(o.sel)+'已经选好了':'')); };
+    $('dsNo').onclick=function(){ stopSpeak(); sheetOnClose=null; dropAdded(o); closeSheet(); toast('好，'+d.name+'留在菜谱里了', 4500); };
+    if(!o.saidAsk){ o.saidAsk=true; speak(d.name+(o.justCreated?'加进菜谱了，要买的放进菜篮子了。':'。')+'加进这周的晚饭吗？'); }
+    return;
+  }
+  var sel=o.flow?o.sel:null;
+  box.innerHTML='<div class="sec2">'+(o.flow?'哪天晚上做？':'哪天做？点一天就排上')+'</div><div class="dgrid">'+planDays().map(function(p){
+      var c=cookNamesFull(p), has=p.cook&&(p.cook.dishIds||[]).indexOf(d.id)>=0;
+      return '<button type="button" data-date="'+p.date+'" class="'+(sel===p.date?'sel':'')+'"'+(p.done||has?' disabled':'')+'>'+esc(nightFull(p.date))+(sel===p.date?' ✓':'')+'<small>'+esc(has?'已经排在这天':p.done?'做好了':c?'已定：'+c:p.cook&&p.cook.text===NO_COOK?'不做饭':'还没定')+'</small></button>'; }).join('')+'</div>'
+    +(o.flow?'<button type="button" class="big-btn primary" id="dsGo" style="width:100%"'+(sel?'':' disabled')+'>就这天</button><button type="button" class="big-btn ghost" id="dsDayVoice" data-label="🎤 也可以说「周四」" style="width:100%;margin-top:8px">🎤 也可以说「周四」</button><p class="note" id="dsNote"></p>':'');
+  function schedule(date){
+    o.scheduled=true; sheetOnClose=null; stopSpeak();
+    addToDay(d.id, date, {clearPending:true, replaceDishId:o.replaceDishId||undefined}).then(function(r){ if(r){ closeSheet(); speak('好，'+nightLabel(date)+'做'+d.name); } });
+  }
+  Array.prototype.forEach.call(box.querySelectorAll('.dgrid button'), function(b){ b.onclick=function(){ var dt=b.getAttribute('data-date'); if(o.flow){ o.sel=dt; drawDishAct(d,o); } else schedule(dt); }; });
+  if($('dsGo')) $('dsGo').onclick=function(){ if(o.sel) schedule(o.sel); };
+  if($('dsDayVoice')) $('dsDayVoice').onclick=function(){ voiceCapture({btn:$('dsDayVoice'),status:$('dsNote'),input:null,onText:function(t){ var dt=dayFromText(t); if(dt){ o.sel=dt; drawDishAct(d,o); } else $('dsNote').textContent='没听出是哪天，再说一次，比如「周四」'; }}); };
+}
+function drawDishMore(d){
+  var b=$('dsMoreBox'); if(!b||b.hidden) return;
+  b.innerHTML='<div class="detail"><div class="acts"><label>📷 换照片<input type="file" accept="image/*" id="dsPhoto"></label>'+(d.cat==='dinner'?'<button type="button" id="dsMom">'+(d.mom?'⭐ 是拿手菜（点一下取消）':'☆ 设为拿手菜')+'</button>':'')+'<button type="button" class="del" id="dsDel">删除这道菜</button></div></div>';
+  $('dsPhoto').onchange=function(){ var f=$('dsPhoto').files[0]; if(f){ closeSheet(); uploadPhoto(d.id, f); } };
+  if($('dsMom')) $('dsMom').onclick=function(){ closeSheet(); act(api('/api/dishes/'+d.id+'/update',{method:'POST',json:{mom:!d.mom}}), d.mom?'取消拿手菜了':'设为拿手菜了'); };
+  $('dsDel').onclick=function(){ var x=$('dsDel'); if(!x.classList.contains('confirm')){ x.classList.add('confirm'); x.textContent='确定删除？再点一下'; return; } closeSheet(); act(api('/api/dishes/'+d.id,{method:'DELETE'}),'删掉了'); };
+}
+
+// ===================== 帮我想新菜 =====================
+var ideasState=null;
+function openIdeas(cat){ ideasState={cat:cat||'dinner', items:[], loading:true}; drawIdeas(); fetchIdeas(); }
+function drawIdeas(){
+  var c=ideasState;
+  openSheet('<h3>✨ 帮你想了几道新菜</h3><p class="hint" style="text-align:left;margin:0 0 8px">家里菜谱里还没有的'+(c.cat==='breakfast'?'早饭':'晚饭的菜')+'</p>'
+    +(c.loading?'<p class="note">正在想…</p>':c.err?'<p class="note">'+esc(c.err)+'</p>':c.items.map(function(x,i){ return '<div class="act"><div class="x"><b>'+esc(x.name)+'</b><small>'+(x.ingredients.length?'要买：'+esc(x.ingredients.slice(0,5).join('、')):'')+'</small><div class="btns3"><button type="button" data-see="'+i+'">看做法 ›</button><button type="button" class="g" data-no="'+i+'">不要</button></div></div></div>'; }).join(''))
+    +'<div class="btns3"><button type="button" class="g" id="idMore">换一批</button><button type="button" class="g" id="idClose">关上</button></div>');
+  Array.prototype.forEach.call($('sheetBody').querySelectorAll('[data-see]'), function(b){ b.onclick=function(){ var x=c.items[Number(b.getAttribute('data-see'))]; if(x) createIdea({name:x.name,ingredients:x.ingredients,steps:x.steps,cat:c.cat}, {cat:c.cat}); }; });
+  Array.prototype.forEach.call($('sheetBody').querySelectorAll('[data-no]'), function(b){ b.onclick=function(){ c.items.splice(Number(b.getAttribute('data-no')),1); drawIdeas(); }; });
+  $('idMore').onclick=function(){ c.loading=true; c.seen=(c.seen||[]).concat(c.items.map(function(x){ return x.name; })); drawIdeas(); fetchIdeas(); };
+  $('idClose').onclick=closeSheet;
+}
+function fetchIdeas(){
+  var c=ideasState;
+  post('/api/suggest',{cat:c.cat, n:4, exclude:c.seen||[]}).then(function(r){ if(ideasState!==c) return; c.loading=false; c.items=(r.items||[]).map(function(x){ return {name:x.name, ingredients:x.ingredients||[], steps:x.steps||[]}; }); c.err=c.items.length?'':'AI 没想出来，点「换一批」再试试'; drawIdeas(); })
+    .catch(function(e){ if(ideasState!==c) return; c.loading=false; c.err=e.message||'AI 出错了'; drawIdeas(); });
+}
+
+// ---- 身份与页签 ----
+function defaultView(){ return role==='mom' ? 'today' : 'days'; }
 function showView(v){
   var allowed=NAV[role]||VIEWS; if(allowed.indexOf(v)<0) v=defaultView();
+  if(v!=='recipes') pickFor=null;
   VIEWS.forEach(function(x){ $('view-'+x).classList.toggle('active', x===v); });
   Array.prototype.forEach.call(document.querySelectorAll('#nav button'), function(b){ b.classList.toggle('active', b.getAttribute('data-view')===v); });
 }
 function buildNav(){
   var nav=$('nav'), views=NAV[role]||VIEWS;
   nav.classList.toggle('four', views.length>=4);
-  nav.innerHTML=views.map(function(v){ return '<button type="button" data-view="'+v+'">'+VIEW_NAMES[v]+'<span class="badge" hidden></span></button>'; }).join('');
-  Array.prototype.forEach.call(nav.querySelectorAll('button'), function(b){ b.onclick=function(){ showView(b.getAttribute('data-view')); }; });
+  // 每个页签下面一行小字，说这一页干什么
+  nav.innerHTML=views.map(function(v){ var n=VIEW_NAMES[v]; return '<button type="button" data-view="'+v+'">'+n[0]+'<small>'+n[1]+'</small><span class="badge" hidden></span></button>'; }).join('');
+  Array.prototype.forEach.call(nav.querySelectorAll('button'), function(b){ b.onclick=function(){ showView(b.getAttribute('data-view')); render(); window.scrollTo(0,0); }; });
 }
 function updateNavBadge(){
   var b=document.querySelector('#nav button[data-view="shop"] .badge'); if(!b) return;
@@ -1275,8 +1678,8 @@ function renderWho(){
   Array.prototype.forEach.call($('whoBtns').querySelectorAll('button'), function(b){ b.onclick=function(){ var r=b.getAttribute('data-role'); store('bf_role', r); applyRole(r); }; });
 }
 // 底部弹出的面板：头像 / 换人 / 提意见 / 红包
-function openSheet(html){ $('sheetBody').innerHTML=html; $('sheet').hidden=false; }
-function closeSheet(){ $('sheet').hidden=true; $('sheetBody').innerHTML=''; if(renderPending) render(); }
+function openSheet(html){ sheetOnClose=null; $('sheetBody').innerHTML=html; $('sheet').hidden=false; $('sheet').scrollTop=0; $('sheetBody').scrollTop=0; }
+function closeSheet(){ var f=sheetOnClose; sheetOnClose=null; $('sheet').hidden=true; $('sheetBody').innerHTML=''; if(f) f(); if(renderPending) render(); }
 $('sheet').onclick=function(e){ if(e.target===$('sheet')) closeSheet(); };
 function openProfile(focusFeedback){
   openSheet('<div style="text-align:center">'+av(role,'xl')+'<div style="font-size:30px;font-weight:800;margin:8px 0 12px">'+esc(PEOPLE[role].name)+'</div>'
